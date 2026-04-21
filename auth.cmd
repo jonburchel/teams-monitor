@@ -13,7 +13,7 @@ echo   - Microsoft Teams
 echo   - Microsoft Mail
 echo   - Microsoft Calendar
 echo.
-echo After signing in, close this window and run: run.ps1
+echo After signing in, close this window and run: start-agents.ps1
 echo.
 
 agency copilot --no-default-mcps --mcp teams --mcp mail --mcp calendar -- -s

@@ -15,7 +15,8 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-$scriptDir = "F:\home\teams-monitor"
+$scriptDir = $PSScriptRoot
+if (-not $scriptDir) { $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path }
 Set-Location $scriptDir
 
 $config = Get-Content "workflow.config.json" -Raw | ConvertFrom-Json
@@ -139,8 +140,8 @@ $tempFiles = @()
 $userMcpConfig = Join-Path $env:USERPROFILE ".copilot\mcp-config.json"
 $backupConfig = "$userMcpConfig.bak-teams-monitor"
 
-# Backup MCP config ONCE before any modifications
-if (Test-Path $userMcpConfig) {
+# Backup MCP config ONCE before any modifications (only if no backup exists)
+if ((Test-Path $userMcpConfig) -and -not (Test-Path $backupConfig)) {
     Copy-Item $userMcpConfig $backupConfig -Force -ErrorAction SilentlyContinue
     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Backed up mcp-config.json"
 }
@@ -243,9 +244,9 @@ while (true) {
 Every response you give MUST end with a call to check_messages(). No exceptions. If your last tool call in a turn is NOT check_messages(), you are doing it wrong.
 
 ## STARTUP
-When you first start, BEFORE entering the loop, announce yourself by calling send_reply with a brief hello posted as a NEW channel message (not a reply). Use send_reply with messageId set to "" or "new" to post a top-level message. If that fails, just proceed to the loop silently.
-
-Your hello should be brief, like: "Online and monitoring the $($channel.name) channel. Working directory: $($channel.workingDirectory). Post a message and I'll respond."
+When you first start, BEFORE entering the loop, announce yourself by calling:
+  post_channel_message(channelId="$($channel.channelId)", channelName="$($channel.name)", messageText="Online and monitoring the $($channel.name) channel. Working directory: $($channel.workingDirectory). Post a message and I'll respond.")
+If that errors, proceed silently to the loop. Do NOT use send_reply for the hello (it requires a messageId).
 
 ## RULES
 - Working directory: $($channel.workingDirectory)
@@ -308,7 +309,13 @@ try {
                     foreach ($s in $sessions) { if ($s.process -and -not $s.process.HasExited) { $s.process.Kill() } }
                     if ($mcpProc -and -not $mcpProc.HasExited) { $mcpProc.Kill() }
                     if ($watcherProc -and -not $watcherProc.HasExited) { $watcherProc.Kill() }
+                    # Restore MCP config before restart (finally won't run cleanly)
+                    if (Test-Path $backupConfig) {
+                        Copy-Item $backupConfig $userMcpConfig -Force
+                        Remove-Item $backupConfig -Force -ErrorAction SilentlyContinue
+                    }
                     Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
+                    $script:isRestarting = $true
                     & $MyInvocation.MyCommand.Path -Model $Model -McpPort $McpPort -AutoUpdate
                     exit 0
                 }
@@ -350,23 +357,25 @@ try {
         Start-Sleep -Seconds 30
     }
 } finally {
-    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Shutting down..."
-    foreach ($s in $sessions) {
-        if (-not $s.process.HasExited) { $s.process.Kill(); Write-Host "  Killed $($s.name)" }
-    }
-    if (-not $mcpProc.HasExited) { $mcpProc.Kill(); Write-Host "  Killed MCP proxy" }
-    if ($watcherProc -and -not $watcherProc.HasExited) { $watcherProc.Kill(); Write-Host "  Killed browser watcher" }
+    if ($script:isRestarting) {
+        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Handing off to new instance..."
+    } else {
+        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Shutting down..."
+        foreach ($s in $sessions) {
+            if ($s.process -and -not $s.process.HasExited) { $s.process.Kill(); Write-Host "  Killed $($s.name)" }
+        }
+        if ($mcpProc -and -not $mcpProc.HasExited) { $mcpProc.Kill(); Write-Host "  Killed MCP proxy" }
+        if ($watcherProc -and -not $watcherProc.HasExited) { $watcherProc.Kill(); Write-Host "  Killed browser watcher" }
 
-    # Remove bridge entries from global MCP config (restore from backup)
-    $userMcpConfig = Join-Path $env:USERPROFILE ".copilot\mcp-config.json"
-    $backupConfig = "$userMcpConfig.bak-teams-monitor"
-    if (Test-Path $backupConfig) {
-        Copy-Item $backupConfig $userMcpConfig -Force
-        Remove-Item $backupConfig -Force -ErrorAction SilentlyContinue
-        Write-Host "  Restored mcp-config.json from backup"
+        # Restore MCP config from backup
+        if (Test-Path $backupConfig) {
+            Copy-Item $backupConfig $userMcpConfig -Force
+            Remove-Item $backupConfig -Force -ErrorAction SilentlyContinue
+            Write-Host "  Restored mcp-config.json from backup"
+        }
+        Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
+        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] All stopped."
     }
-    Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
-    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] All stopped."
 }
 
 

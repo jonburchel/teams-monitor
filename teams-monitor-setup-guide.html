@@ -123,7 +123,7 @@
     <div class="feature-card">
       <div class="emoji">💬</div>
       <h4>Chat in Teams</h4>
-      <p>Post a message in your Teams channel. A persistent AI agent picks it up within seconds (3s when active, 15s idle) and responds in-thread with a styled Adaptive Card.</p>
+      <p>Post a message in your Teams channel. A persistent AI agent picks it up instantly via browser push detection, with 15s API polling as fallback and responds in-thread with a styled Adaptive Card.</p>
     </div>
     <div class="feature-card">
       <div class="emoji">🧠</div>
@@ -610,7 +610,7 @@ Register-ScheduledTask -TaskName "TeamsMonitor" -TaskPath "\" `
     <tr><td><code>background-tasks.json</code></td><td>Scheduled automations (calendar guard, email digest)</td></tr>
     <tr><td><code>auth.cmd</code></td><td>One-time MCP OAuth sign-in (opens browser)</td></tr>
     <tr><td><code>teams-bridge/index.mjs</code></td><td>Teams Bridge MCP: polls proxy, queues messages, posts Adaptive Card replies, tracks threads</td></tr>
-    <tr><td><code>teams-bridge/teams-watcher.mjs</code></td><td>Browser watcher: reads sidebar unread badges every 2s, triggers fast polling</td></tr>
+    <tr><td><code>teams-bridge/teams-watcher.mjs</code></td><td>Browser watcher: MutationObserver push detection (one tab per channel, no polling)</td></tr>
     <tr><td><code>.agents/charter-source/</code></td><td>Agent charters: identity, expertise, channel-specific instructions</td></tr>
     <tr><td><code>.agents/memory/</code></td><td>Persistent agent memory: decisions, learnings, context across sessions (committed to git)</td></tr>
     <tr><td><code>.agents/state/</code></td><td>Runtime state: last-seen cursors, lock file, notifications (gitignored)</td></tr>

@@ -103,11 +103,11 @@ function checkWatcherNotification() {
 // We just connect to it.
 
 async function mcpCall(method, params, timeoutMs = 45000) {
-  mcpRequestId++;
+  const myId = ++mcpRequestId;
   const isNotification = method.startsWith("notifications/");
   const envelope = isNotification
     ? { jsonrpc: "2.0", method, params }
-    : { jsonrpc: "2.0", method, id: mcpRequestId, params };
+    : { jsonrpc: "2.0", method, id: myId, params };
   const body = JSON.stringify(envelope);
 
   const resp = await fetch(`http://localhost:${mcpPort}/`, {
@@ -136,7 +136,7 @@ async function mcpCall(method, params, timeoutMs = 45000) {
   }
 
   // Pick the response matching our request ID
-  const env = results.find(r => r.id === mcpRequestId) ?? results.at(-1);
+  const env = results.find(r => r.id === myId) ?? results.at(-1);
 
   // Check for JSON-RPC errors
   if (env?.error) throw new Error(`MCP error ${env.error.code}: ${env.error.message}`);
@@ -419,7 +419,7 @@ server.tool(
       // Fire-and-forget: send self-DM notification
       mcpToolCall("SendMessageToSelf", {
         content: `[Teams Monitor] ${channelName}: ${replyText.slice(0, 80)}...`
-      }).catch(() => {});
+      }).catch(e => console.error(`${label} SendMessageToSelf failed: ${e.message}`));
 
       // Fire-and-forget: mark as unread via Playwright subprocess
       // NOTE: Disabled until persistent browser watcher is implemented.

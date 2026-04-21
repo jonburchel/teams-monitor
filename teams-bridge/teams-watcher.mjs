@@ -92,10 +92,14 @@ async function setupChannelTab(context, channel, teamId) {
 
     let container = findMessageContainer();
     let debounceTimer = null;
+    let currentObserver = null;
 
     function startObserving(target) {
       if (!target) return;
-      const observer = new MutationObserver((mutations) => {
+      // Disconnect previous observer to prevent duplicates
+      if (currentObserver) currentObserver.disconnect();
+
+      currentObserver = new MutationObserver((mutations) => {
         // Debounce: multiple mutations fire at once when a message arrives
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
@@ -111,7 +115,7 @@ async function setupChannelTab(context, channel, teamId) {
         }, 500); // 500ms debounce to batch rapid mutations
       });
 
-      observer.observe(target, { childList: true, subtree: true });
+      currentObserver.observe(target, { childList: true, subtree: true });
       console.log(`[teams-watcher] MutationObserver active for ${chName} on`, target.tagName, target.className?.slice(0, 50));
     }
 
@@ -129,21 +133,60 @@ async function setupChannelTab(context, channel, teamId) {
   }, channelName);
 
   console.error(`[watcher] ${channel.name}: MutationObserver injected. Listening for push events.`);
+
+  // Re-inject observer if Teams navigates the SPA
+  page.on('load', async () => {
+    console.error(`[watcher] ${channel.name}: Page reloaded, re-injecting observer...`);
+    await page.waitForTimeout(5000);
+    try {
+      await page.evaluate((chName) => {
+        // Simplified re-injection
+        function findMessageContainer() {
+          const candidates = [
+            document.querySelector('[data-tid="message-pane-list-items"]'),
+            document.querySelector('[role="main"] [role="list"]'),
+            document.querySelector('[role="main"]')
+          ];
+          return candidates.find(el => el);
+        }
+        const target = findMessageContainer();
+        if (target) {
+          const obs = new MutationObserver((mutations) => {
+            for (const m of mutations) {
+              for (const node of m.addedNodes) {
+                if (node.nodeType === 1 && node.textContent && node.textContent.trim().length > 5) {
+                  window.__teamsMonitorNotify(chName);
+                  return;
+                }
+              }
+            }
+          });
+          obs.observe(target, { childList: true, subtree: true });
+          console.log('[teams-watcher] Observer re-injected after navigation for', chName);
+        }
+      }, channelName);
+    } catch (e) {
+      console.error(`[watcher] ${channel.name}: Re-injection failed: ${e.message}`);
+    }
+  });
+
   return page;
 }
 
 async function main() {
   console.error("[watcher] Starting Teams browser with MutationObserver push detection...");
 
+  // If profile exists (returning user), position off-screen. Otherwise visible for first-run auth.
+  const isFirstRun = !existsSync(join(PROFILE_DIR, "Default", "Preferences"));
+  const windowArgs = isFirstRun
+    ? ["--disable-blink-features=AutomationControlled", "--window-size=900,700"]
+    : ["--disable-blink-features=AutomationControlled", "--window-size=400,300", "--window-position=9999,9999"];
+
   const context = await chromium.launchPersistentContext(PROFILE_DIR, {
     channel: "msedge",
     headless: false,
-    args: [
-      "--disable-blink-features=AutomationControlled",
-      "--window-size=400,300",
-      "--window-position=9999,9999"
-    ],
-    viewport: { width: 400, height: 300 }
+    args: windowArgs,
+    viewport: isFirstRun ? { width: 900, height: 700 } : { width: 400, height: 300 }
   });
 
   // Close the default blank tab
