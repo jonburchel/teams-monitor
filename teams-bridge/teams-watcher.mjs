@@ -51,9 +51,8 @@ async function setupChannelTab(context, channel, teamId) {
   // Wait for Teams to load
   try {
     await page.waitForSelector('nav[aria-label="Apps"]', { timeout: 30000 });
-  } catch {
-    console.error(`[watcher] ${channel.name}: Waiting for auth (first run). Sign in manually.`);
-    await page.waitForSelector('nav[aria-label="Apps"]', { timeout: 120000 });
+  } catch (e) {
+    console.error(`[watcher] ${channel.name}: Teams not loaded: ${e.message}`);
   }
 
   // Navigate to the channel via sidebar
@@ -176,18 +175,55 @@ async function setupChannelTab(context, channel, teamId) {
 async function main() {
   console.error("[watcher] Starting Teams browser with MutationObserver push detection...");
 
-  // First run: headed for auth sign-in. After that: headless (no window, no taskbar).
-  const isFirstRun = !existsSync(join(PROFILE_DIR, "Default", "Preferences"));
-  const launchArgs = isFirstRun
-    ? ["--disable-blink-features=AutomationControlled", "--window-size=900,700"]
-    : ["--disable-blink-features=AutomationControlled", "--headless=new"];
+  let context;
+  let headless = true;
 
-  const context = await chromium.launchPersistentContext(PROFILE_DIR, {
-    channel: "msedge",
-    headless: !isFirstRun,
-    args: launchArgs,
-    viewport: isFirstRun ? { width: 900, height: 700 } : { width: 400, height: 300 }
-  });
+  // Try headless first (uses cached auth from persistent profile)
+  try {
+    console.error("[watcher] Attempting headless launch...");
+    context = await chromium.launchPersistentContext(PROFILE_DIR, {
+      channel: "msedge",
+      headless: true,
+      args: ["--disable-blink-features=AutomationControlled", "--headless=new"],
+      viewport: { width: 400, height: 300 }
+    });
+
+    const testPage = context.pages()[0] || await context.newPage();
+    await testPage.goto("https://teams.cloud.microsoft", { waitUntil: "domcontentloaded" });
+    await testPage.waitForSelector('nav[aria-label="Apps"]', { timeout: 20000 });
+    console.error("[watcher] Headless auth OK. No window needed.");
+    await testPage.close();
+  } catch {
+    // Headless auth failed - close and relaunch headed for sign-in
+    console.error("[watcher] Headless auth failed. Launching visible browser for sign-in...");
+    try { await context.close(); } catch {}
+
+    context = await chromium.launchPersistentContext(PROFILE_DIR, {
+      channel: "msedge",
+      headless: false,
+      args: ["--disable-blink-features=AutomationControlled", "--window-size=900,700"],
+      viewport: { width: 900, height: 700 }
+    });
+    headless = false;
+
+    const authPage = context.pages()[0] || await context.newPage();
+    await authPage.goto("https://teams.cloud.microsoft", { waitUntil: "domcontentloaded" });
+    console.error("[watcher] Sign in to Teams in the browser window. It will switch to headless after auth.");
+    await authPage.waitForSelector('nav[aria-label="Apps"]', { timeout: 120000 });
+    console.error("[watcher] Auth complete. Closing headed browser and relaunching headless...");
+    await authPage.close();
+    await context.close();
+
+    // Relaunch headless now that profile has cached auth
+    context = await chromium.launchPersistentContext(PROFILE_DIR, {
+      channel: "msedge",
+      headless: true,
+      args: ["--disable-blink-features=AutomationControlled", "--headless=new"],
+      viewport: { width: 400, height: 300 }
+    });
+    headless = true;
+    console.error("[watcher] Headless relaunch with cached auth.");
+  }
 
   // Close the default blank tab
   const defaultPage = context.pages()[0];
