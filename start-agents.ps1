@@ -26,7 +26,7 @@ $lockFile = Join-Path $scriptDir ".agents\state\monitor.lock"
 $stateDir = Join-Path $scriptDir ".agents\state"
 $bridgeDir = Join-Path $scriptDir "teams-bridge"
 $nodeExe = (Get-Command node -ErrorAction SilentlyContinue).Source
-if (-not $nodeExe) { Write-Host "ERROR: Node.js not found in PATH. Install Node 18+ and retry."; exit 1 }
+if (-not $nodeExe) { Write-Host "ERROR: Node.js not found in PATH. Install Node.js 18+ and retry."; exit 1 }
 
 if (-not (Test-Path $stateDir)) { New-Item -ItemType Directory -Path $stateDir -Force | Out-Null }
 if (Test-Path $sentinelFile) { Remove-Item $sentinelFile -Force }

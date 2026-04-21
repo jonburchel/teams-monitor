@@ -176,15 +176,16 @@ async function setupChannelTab(context, channel, teamId) {
 async function main() {
   console.error("[watcher] Starting Teams browser with MutationObserver push detection...");
 
-  // If profile exists (returning user), position off-screen. Otherwise visible for first-run auth.
+  // Use "new" headless on returning users (no window, no taskbar, but full rendering)
+  // Use headed on first run so user can sign in
   const isFirstRun = !existsSync(join(PROFILE_DIR, "Default", "Preferences"));
   const windowArgs = isFirstRun
     ? ["--disable-blink-features=AutomationControlled", "--window-size=900,700"]
-    : ["--disable-blink-features=AutomationControlled", "--window-size=400,300", "--window-position=9999,9999"];
+    : ["--disable-blink-features=AutomationControlled"];
 
   const context = await chromium.launchPersistentContext(PROFILE_DIR, {
     channel: "msedge",
-    headless: false,
+    headless: isFirstRun ? false : "new",
     args: windowArgs,
     viewport: isFirstRun ? { width: 900, height: 700 } : { width: 400, height: 300 }
   });

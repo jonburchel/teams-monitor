@@ -239,11 +239,11 @@ graph TD
     Teams -->|"DOM push"| Browser
 
     subgraph Infra["Shared Infrastructure"]
-        MCP["🔌 Agency Teams MCP\nHTTP Proxy · port 58410"]
+        MCP["🔌 Agency Teams MCP\nHTTP Proxy · default port 58410"]
         Notify["📁 Notification Files\ntrigger fast polling"]
     end
 
-    Browser -->|"writes on unread"| Notify
+    Browser -->|"push on new message"| Notify
     Teams <-->|"Graph API"| MCP
 
     subgraph Session1["Fabric Docs Agent"]
@@ -308,7 +308,7 @@ graph TD
     </div>
     <div class="prereq-item">
       <div class="icon">📦</div>
-      <h4>Node.js 20+</h4>
+      <h4>Node.js 18+</h4>
       <p>For the Teams Bridge MCP server</p>
     </div>
     <div class="prereq-item">
@@ -576,7 +576,7 @@ Register-ScheduledTask -TaskName "TeamsMonitor" -TaskPath "\" `
 
   <div class="troubleshoot-item">
     <h4>"Permission denied" on Teams MCP calls</h4>
-    <p>Ensure you're running with the <code>--yolo</code> flag (already configured in all scripts). This auto-approves MCP permission requests in non-interactive mode.</p>
+    <p>The <code>--yolo</code> flag is configured in <code>start-agents.ps1</code>. The <code>auth.cmd</code> script is intentionally interactive (no --yolo) so you can complete sign-in. This auto-approves MCP permission requests in non-interactive mode.</p>
   </div>
 
   <div class="troubleshoot-item">
@@ -591,7 +591,7 @@ Register-ScheduledTask -TaskName "TeamsMonitor" -TaskPath "\" `
 
   <div class="troubleshoot-item">
     <h4>Agent sessions keep recycling</h4>
-    <p>This is normal. The LLM occasionally decides it's "done" despite the daemon prompt. The monitor auto-restarts sessions within 5 seconds. Messages are not lost (the bridge queues them). You'll see "session ended. Recycling..." in the log.</p>
+    <p>This is normal. The LLM occasionally decides it's "done" despite the daemon prompt. The monitor auto-restarts sessions within ~35 seconds (next monitor loop cycle). Messages are not lost (the bridge queues them). You'll see "session ended. Recycling..." in the log.</p>
   </div>
 
   <div class="troubleshoot-item">
