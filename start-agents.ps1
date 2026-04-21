@@ -81,9 +81,7 @@ if ($hasUpdate -and $AutoUpdate) {
     $didUpdate = Apply-Update
     if ($didUpdate) {
         Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Restarting with updated code..."
-        Start-Process -FilePath "C:\Program Files\PowerShell\7\pwsh.exe" `
-            -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $MyInvocation.MyCommand.Path, "-Model", $Model, "-McpPort", $McpPort, "-AutoUpdate") `
-            -WorkingDirectory $scriptDir
+        & $MyInvocation.MyCommand.Path -Model $Model -McpPort $McpPort -AutoUpdate
         exit 0
     }
 } elseif ($hasUpdate) {
@@ -305,9 +303,7 @@ try {
                     if ($mcpProc -and -not $mcpProc.HasExited) { $mcpProc.Kill() }
                     if ($watcherProc -and -not $watcherProc.HasExited) { $watcherProc.Kill() }
                     Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
-                    Start-Process -FilePath "C:\Program Files\PowerShell\7\pwsh.exe" `
-                        -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $MyInvocation.MyCommand.Path, "-Model", $Model, "-McpPort", $McpPort, "-AutoUpdate") `
-                        -WorkingDirectory $scriptDir
+                    & $MyInvocation.MyCommand.Path -Model $Model -McpPort $McpPort -AutoUpdate
                     exit 0
                 }
             }
