@@ -24,6 +24,7 @@ import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { markThreadUnread, closeBrowser } from "./mark-unread.mjs";
 
 let ServiceBusClient;
 try {
@@ -501,16 +502,14 @@ server.tool(
         content: `[Teams Monitor] ${channelName}: ${replyText.slice(0, 80)}...`
       }).catch(e => console.error(`${label} SendMessageToSelf failed: ${e.message}`));
 
-      // Fire-and-forget: mark as unread via Playwright subprocess
-      // NOTE: Disabled until persistent browser watcher is implemented.
-      // The standalone script lacks auth and Teams detects headless automation.
-      // const markUnreadScript = join(__dirname, "mark-unread.mjs");
-      // const nodeExe = process.execPath;
-      // const child = spawn(nodeExe, [markUnreadScript, channelName, replyText.slice(0, 30)], {
-      //   stdio: "ignore", detached: true
-      // });
-      // child.unref();
-      // console.error(`${label} mark-unread spawned for ${channelName}`);
+      // Fire-and-forget: mark thread as unread via deterministic Playwright automation
+      // This runs in the background and never blocks the main loop
+      markThreadUnread(channelId, config.teamId, channelName, replyText.slice(0, 60))
+        .then(r => {
+          if (r.success) console.error(`${label} Marked unread (${r.elapsed}ms, ${r.method})`);
+          else console.error(`${label} Mark-unread skipped: ${r.error}`);
+        })
+        .catch(e => console.error(`${label} Mark-unread error: ${e.message}`));
 
       return { content: [{ type: "text", text: JSON.stringify({ success: true }) }] };
     } catch (e) {
@@ -626,6 +625,7 @@ process.on("SIGINT", () => { cleanup(); process.exit(0); });
 process.on("SIGTERM", () => { cleanup(); process.exit(0); });
 function cleanup() {
   clearTimeout(pollTimer);
+  closeBrowser().catch(() => {});
 }
 
 main().catch(e => { console.error(`${label} Fatal: ${e.message}`); process.exit(1); });
