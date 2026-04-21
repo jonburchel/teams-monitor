@@ -124,9 +124,20 @@ Write-Host @"
 
 # Step 1: Start the shared Teams MCP HTTP proxy
 Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Starting Teams MCP proxy on port $McpPort..."
+
+# Kill any stale proxy/agent processes from previous runs
+Get-CimInstance Win32_Process | Where-Object { 
+    ($_.Name -eq "agency.exe" -and $_.ProcessId -ne $PID) -or
+    ($_.CommandLine -and $_.CommandLine -match "teams-bridge.*index\.mjs")
+} | ForEach-Object {
+    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Killing stale process PID $($_.ProcessId) ($($_.Name))"
+    try { [System.Diagnostics.Process]::GetProcessById($_.ProcessId).Kill() } catch {}
+}
+Start-Sleep -Seconds 1
+
 $mcpOutFile = Join-Path $stateDir "mcp-proxy-port.txt"
 $mcpErrFile = Join-Path $stateDir "mcp-proxy-log.txt"
-"" | Out-File $mcpOutFile; "" | Out-File $mcpErrFile
+"" | Out-File $mcpOutFile -Force; "" | Out-File $mcpErrFile -Force
 
 $mcpProc = Start-Process -FilePath $agencyExe `
     -ArgumentList "mcp teams --transport http --port $McpPort" `
