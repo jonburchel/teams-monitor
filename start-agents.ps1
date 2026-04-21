@@ -3,8 +3,8 @@
     Launches persistent Copilot sessions with per-channel Teams Bridge MCP.
 .DESCRIPTION
     1. Starts the Agency Teams MCP HTTP proxy (shared, port 58410)
-    2. For each channel, generates a local mcp-config JSON pointing to the bridge
-    3. Launches a persistent agency copilot session per channel with --autopilot
+    2. For each channel, creates a per-agent config directory with merged MCP config
+    3. Launches copilot.exe directly per channel with --config-dir (bypasses Agency MCP loading bug)
     4. Each session calls check_messages() in a loop via the bridge MCP
 #>
 
@@ -21,6 +21,11 @@ Set-Location $scriptDir
 
 $config = Get-Content "workflow.config.json" -Raw | ConvertFrom-Json
 $agencyExe = (Get-Command agency.exe -ErrorAction SilentlyContinue).Source; if (-not $agencyExe) { $agencyExe = Join-Path $env:APPDATA "agency\CurrentVersion\agency.exe" }
+$copilotExe = (Get-Command copilot -ErrorAction SilentlyContinue).Source
+if (-not $copilotExe) {
+    $copilotExe = Join-Path $env:LOCALAPPDATA "Microsoft\WinGet\Packages\GitHub.Copilot_Microsoft.Winget.Source_8wekyb3d8bbwe\copilot.exe"
+}
+if (-not (Test-Path $copilotExe)) { Write-Host "ERROR: Copilot CLI not found. Install via winget install GitHub.Copilot."; exit 1 }
 $sentinelFile = Join-Path $scriptDir ".agents\ralph-stop"
 $lockFile = Join-Path $scriptDir ".agents\state\monitor.lock"
 $stateDir = Join-Path $scriptDir ".agents\state"
@@ -122,35 +127,67 @@ $mcpProc = Start-Process -FilePath $agencyExe `
     -PassThru -NoNewWindow -RedirectStandardOutput $mcpOutFile -RedirectStandardError $mcpErrFile
 
 Write-Host "[$(Get-Date -Format 'HH:mm:ss')] MCP proxy PID: $($mcpProc.Id). Waiting for startup..."
-Start-Sleep -Seconds 10
+
+# Wait for proxy to be ready (up to 30 seconds)
+$proxyReady = $false
+for ($i = 0; $i -lt 30; $i++) {
+    Start-Sleep -Seconds 1
+    try {
+        $null = Invoke-WebRequest "http://localhost:$McpPort/" -Method POST -Body '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' -ContentType "application/json" -TimeoutSec 3 -ErrorAction Stop
+        $proxyReady = $true
+        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] MCP proxy ready (${i}s)"
+        break
+    } catch { }
+}
+if (-not $proxyReady) {
+    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] WARNING: Proxy not responding after 30s. Bridges will retry on their own."
+}
 
 # Step 1b: Watcher is built into the bridge (fast 5s internal polling, no browser needed)
 $watcherProc = $null
 
-# Step 2: Generate per-channel MCP config and prompt, then launch sessions
+# Step 2: Generate per-channel config directories and prompt, then launch sessions
 $sessions = @()
 $tempFiles = @()
+$globalCopilotDir = Join-Path $env:USERPROFILE ".copilot"
 
 foreach ($channel in $config.channels) {
     $agentId = $channel.agent
     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Setting up $($channel.name) ($agentId)..."
 
-    # Write a LOCAL mcp config for the bridge (never touches global config)
+    # Create per-agent config directory with merged MCP config
+    # This avoids touching global ~/.copilot/mcp-config.json entirely
     $bridgeIndexPath = Join-Path $bridgeDir "index.mjs"
     $bridgeKey = "teams-bridge-$agentId"
-    $localMcpConfig = Join-Path $stateDir "mcp-bridge-$agentId.json"
+    $agentConfigDir = Join-Path $stateDir "copilot-config-$agentId"
+    if (-not (Test-Path $agentConfigDir)) { New-Item -ItemType Directory -Path $agentConfigDir -Force | Out-Null }
 
-    $bridgeConfig = @{
-        mcpServers = @{
-            $bridgeKey = @{
-                command = $nodeExe
-                args = @($bridgeIndexPath, "--channel", $channel.name, "--mcp-port", "$McpPort")
-                tools = @("*")
-            }
+    # Merge global MCP config + bridge into per-agent mcp-config.json
+    $globalMcpPath = Join-Path $globalCopilotDir "mcp-config.json"
+    $mergedMcp = if (Test-Path $globalMcpPath) { Get-Content $globalMcpPath -Raw | ConvertFrom-Json } else { @{ mcpServers = [pscustomobject]@{} } }
+    $mergedMcp.mcpServers | Add-Member -NotePropertyName $bridgeKey -NotePropertyValue @{
+        command = $nodeExe
+        args = @($bridgeIndexPath, "--channel", $channel.name, "--mcp-port", "$McpPort")
+        tools = @("*")
+    } -Force
+    $mergedMcpPath = Join-Path $agentConfigDir "mcp-config.json"
+    [System.IO.File]::WriteAllText($mergedMcpPath, ($mergedMcp | ConvertTo-Json -Depth 10), (New-Object System.Text.UTF8Encoding $false))
+
+    # Junction supporting files from global config (so auth tokens, settings stay in sync)
+    foreach ($item in @("config.json", "permissions-config.json", "mcp-oauth-config")) {
+        $src = Join-Path $globalCopilotDir $item
+        $dst = Join-Path $agentConfigDir $item
+        if (-not (Test-Path $src)) { continue }
+        if (Test-Path $dst) { continue }  # already exists from previous run
+        $srcItem = Get-Item $src -Force
+        if ($srcItem.PSIsContainer) {
+            cmd /c mklink /J "$dst" "$src" 2>$null | Out-Null
+        } else {
+            New-Item -ItemType HardLink -Path $dst -Target $src -Force -ErrorAction SilentlyContinue | Out-Null
+            if (-not (Test-Path $dst)) { Copy-Item $src $dst -Force }
         }
     }
-    [System.IO.File]::WriteAllText($localMcpConfig, ($bridgeConfig | ConvertTo-Json -Depth 10), (New-Object System.Text.UTF8Encoding $false))
-    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Bridge config: $localMcpConfig"
+    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Config dir: $agentConfigDir ($(($mergedMcp.mcpServers.PSObject.Properties.Name).Count) MCPs)"
 
     # Read channel charter if it exists
     $charterPath = Join-Path $scriptDir ".agents\charter-source\$agentId.md"
@@ -273,12 +310,10 @@ Begin now. Call check_messages().
     [System.IO.File]::WriteAllText($promptFile, $prompt, (New-Object System.Text.UTF8Encoding $false))
     $tempFiles += $promptFile
 
-    # Launch the persistent copilot session with local bridge config
-    $proc = Start-Process -FilePath $agencyExe -ArgumentList @(
-        "copilot"
-        "--mcp", "mail"
-        "--mcp", "calendar"
-        "--additional-mcp-config", "@$localMcpConfig"
+    # Launch copilot.exe directly with --config-dir (bypasses Agency's broken --additional-mcp-config)
+    # Agency is still used for the shared Teams MCP proxy, but sessions run via copilot.exe
+    $proc = Start-Process -FilePath $copilotExe -ArgumentList @(
+        "--config-dir", $agentConfigDir
         "--yolo", "--autopilot"
         "--max-autopilot-continues", "9999"
         "--model", $agentModel
@@ -291,11 +326,11 @@ Begin now. Call check_messages().
         process = $proc
         promptFile = $promptFile
         bridgeKey = $bridgeKey
-        localMcpConfig = $localMcpConfig
+        agentConfigDir = $agentConfigDir
     }
 
     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] $($channel.name) agent started (PID: $($proc.Id))"
-    Start-Sleep -Seconds 3
+    Start-Sleep -Seconds 5  # Stagger launches to let MCP servers initialize
 }
 
 Write-Host "`n[$(Get-Date -Format 'HH:mm:ss')] All $($sessions.Count) agents running."
@@ -352,9 +387,8 @@ try {
                 Start-Sleep -Seconds 5
                 $ch = $config.channels | Where-Object { $_.agent -eq $s.agent }
                 $restartModel = if ($ch.model) { $ch.model } else { $Model }
-                $s.process = Start-Process -FilePath $agencyExe -ArgumentList @(
-                    "copilot", "--mcp", "mail", "--mcp", "calendar",
-                    "--additional-mcp-config", "@$($s.localMcpConfig)",
+                $s.process = Start-Process -FilePath $copilotExe -ArgumentList @(
+                    "--config-dir", $s.agentConfigDir,
                     "--yolo", "--autopilot", "--max-autopilot-continues", "9999",
                     "--model", $restartModel, "-p", $s.promptFile
                 ) -PassThru -NoNewWindow -WorkingDirectory $ch.workingDirectory

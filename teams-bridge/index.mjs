@@ -198,7 +198,9 @@ async function mcpToolCall(name, args) {
 }
 
 async function initMcp() {
-  for (let attempt = 1; attempt <= 5; attempt++) {
+  let attempt = 0;
+  while (true) {
+    attempt++;
     try {
       await mcpCall("initialize", {
         capabilities: {},
@@ -208,14 +210,15 @@ async function initMcp() {
       // Send required initialized notification
       await mcpCall("notifications/initialized", {});
       mcpInitialized = true;
-      console.error(`${label} Teams MCP ready on port ${mcpPort}`);
+      console.error(`${label} Teams MCP ready on port ${mcpPort}${attempt > 1 ? ` (after ${attempt} attempts)` : ""}`);
       return;
     } catch (e) {
-      console.error(`${label} Init attempt ${attempt}/5: ${e.message}`);
-      await new Promise(r => setTimeout(r, 3000 + attempt * 2000));
+      if (attempt <= 3 || attempt % 10 === 0) {
+        console.error(`${label} Init attempt ${attempt}: ${e.message}. Retrying...`);
+      }
+      await new Promise(r => setTimeout(r, Math.min(3000 + attempt * 1000, 10000)));
     }
   }
-  throw new Error("Failed to initialize Teams MCP");
 }
 
 // --- Polling ---
@@ -570,7 +573,7 @@ server.tool(
     for (const task of tasksConfig.tasks) {
       if (task.enabled === false) continue;
       // Wall-clock scheduling: intervalScans * POLL_INTERVAL as milliseconds
-      const intervalMs = (task.intervalScans || 20) * POLL_INTERVAL;
+      const intervalMs = (task.intervalScans || 20) * (usePushMode ? POLL_INTERVAL_PUSH : POLL_INTERVAL_FALLBACK);
       if (!bgTaskSchedule[task.id]) bgTaskSchedule[task.id] = now + intervalMs;
       if (now >= bgTaskSchedule[task.id]) {
         due.push({ id: task.id, description: task.description, prompt: task.prompt });
@@ -612,7 +615,8 @@ async function main() {
   await poll(); // initial
   schedulePoll();
 
-  console.error(`${label} Ready. Polling every ${POLL_INTERVAL/1000}s.`);
+  const activeInterval = usePushMode ? POLL_INTERVAL_PUSH : POLL_INTERVAL_FALLBACK;
+  console.error(`${label} Ready. Polling every ${activeInterval/1000}s.`);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
