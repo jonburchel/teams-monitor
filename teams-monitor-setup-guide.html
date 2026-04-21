@@ -595,7 +595,7 @@ Register-ScheduledTask -TaskName "TeamsMonitor" -TaskPath "\" `
   <h2><span class="num">8</span> File Reference</h2>
   <table>
     <tr><th>File</th><th>Purpose</th></tr>
-    <tr><td><code>start-agents.ps1</code></td><td><strong>Main launcher.</strong> Starts proxy, configures bridges, launches persistent Copilot sessions</td></tr>
+    <tr><td><code>start-agents.ps1</code></td><td><strong>Main launcher.</strong> Starts proxy, creates per-agent config directories, launches copilot.exe sessions directly</td></tr>
     <tr><td><code>workflow.config.json</code></td><td>Channel IDs, agent mappings, custom instructions, model config</td></tr>
     <tr><td><code>background-tasks.json</code></td><td>Scheduled automations (calendar guard, email digest)</td></tr>
     <tr><td><code>auth.cmd</code></td><td>One-time MCP OAuth sign-in (opens browser)</td></tr>
