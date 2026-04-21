@@ -60,27 +60,34 @@ function Check-ForUpdates {
 }
 
 function Apply-Update {
+    $beforeHash = (git -C $scriptDir rev-parse HEAD 2>$null).Trim()
     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Pulling latest changes..."
+    $env:GIT_TERMINAL_PROMPT = '0'
     git -C $scriptDir pull --ff-only origin 2>&1 | ForEach-Object { Write-Host "  $_" }
-    # Reinstall bridge deps if package.json changed
+    $afterHash = (git -C $scriptDir rev-parse HEAD 2>$null).Trim()
+    if ($beforeHash -eq $afterHash) {
+        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Already up to date (local may be ahead of remote). Skipping restart."
+        return $false
+    }
     Push-Location $bridgeDir
     npm install --quiet 2>$null
     Pop-Location
     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Update applied."
+    return $true
 }
 
 $hasUpdate = Check-ForUpdates
-if ($hasUpdate) {
-    if ($AutoUpdate) {
-        Apply-Update
+if ($hasUpdate -and $AutoUpdate) {
+    $didUpdate = Apply-Update
+    if ($didUpdate) {
         Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Restarting with updated code..."
         Start-Process -FilePath "C:\Program Files\PowerShell\7\pwsh.exe" `
             -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $MyInvocation.MyCommand.Path, "-Model", $Model, "-McpPort", $McpPort, "-AutoUpdate") `
             -WorkingDirectory $scriptDir
         exit 0
-    } else {
-        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Run with -AutoUpdate to apply automatically, or 'git pull' manually."
     }
+} elseif ($hasUpdate) {
+    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Run with -AutoUpdate to apply automatically, or 'git pull' manually."
 }
 
 # Lock check
@@ -291,17 +298,18 @@ try {
         # Periodic update check
         if ($AutoUpdate -and ($loopCount % $updateCheckInterval -eq 0)) {
             if (Check-ForUpdates) {
-                Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Update detected. Restarting with new code..."
-                foreach ($s in $sessions) { if ($s.process -and -not $s.process.HasExited) { $s.process.Kill() } }
-                if ($mcpProc -and -not $mcpProc.HasExited) { $mcpProc.Kill() }
-                if ($watcherProc -and -not $watcherProc.HasExited) { $watcherProc.Kill() }
-                Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
-                Apply-Update
-                # Spawn a NEW process (not recursive call) and exit
-                Start-Process -FilePath "C:\Program Files\PowerShell\7\pwsh.exe" `
-                    -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $MyInvocation.MyCommand.Path, "-Model", $Model, "-McpPort", $McpPort, "-AutoUpdate") `
-                    -WorkingDirectory $scriptDir
-                exit 0
+                $didUpdate = Apply-Update
+                if ($didUpdate) {
+                    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Update applied. Restarting..."
+                    foreach ($s in $sessions) { if ($s.process -and -not $s.process.HasExited) { $s.process.Kill() } }
+                    if ($mcpProc -and -not $mcpProc.HasExited) { $mcpProc.Kill() }
+                    if ($watcherProc -and -not $watcherProc.HasExited) { $watcherProc.Kill() }
+                    Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
+                    Start-Process -FilePath "C:\Program Files\PowerShell\7\pwsh.exe" `
+                        -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $MyInvocation.MyCommand.Path, "-Model", $Model, "-McpPort", $McpPort, "-AutoUpdate") `
+                        -WorkingDirectory $scriptDir
+                    exit 0
+                }
             }
         }
 
