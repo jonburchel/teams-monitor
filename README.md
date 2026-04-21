@@ -61,4 +61,4 @@ teams-monitor/
 
 ## Stopping
 
-Ctrl+C or create `.agents\ralph-stop`. Cleans up all processes and browser. No global config restoration needed (bridge MCPs use local config files only).
+Ctrl+C or create `.agents\ralph-stop`. Cleans up all processes. No global config restoration needed (bridge MCPs use local config files only).
