@@ -43,7 +43,7 @@ cp workflow.config.example.json workflow.config.json  # edit with your IDs
 .\start-agents.ps1 -AutoUpdate  # with auto-pull from git
 ```
 
-On first run, the browser watcher opens an Edge window for Teams sign-in. After that, auth persists across restarts.
+The browser watcher runs headless by default. If cached auth is missing (first run or token expiry), it opens a visible Edge window for sign-in, then switches back to headless automatically.
 
 ## Files
 

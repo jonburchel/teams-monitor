@@ -184,19 +184,19 @@ async function main() {
     context = await chromium.launchPersistentContext(PROFILE_DIR, {
       channel: "msedge",
       headless: true,
-      args: ["--disable-blink-features=AutomationControlled", "--headless=new"],
+      args: ["--disable-blink-features=AutomationControlled"],
       viewport: { width: 400, height: 300 }
     });
 
     const testPage = context.pages()[0] || await context.newPage();
     await testPage.goto("https://teams.cloud.microsoft", { waitUntil: "domcontentloaded" });
-    await testPage.waitForSelector('nav[aria-label="Apps"]', { timeout: 20000 });
+    await testPage.waitForSelector('nav[aria-label="Apps"]', { timeout: 45000 });
     console.error("[watcher] Headless auth OK. No window needed.");
     await testPage.close();
   } catch {
     // Headless auth failed - close and relaunch headed for sign-in
     console.error("[watcher] Headless auth failed. Launching visible browser for sign-in...");
-    try { await context.close(); } catch {}
+    try { if (context) await context.close(); } catch {}
 
     context = await chromium.launchPersistentContext(PROFILE_DIR, {
       channel: "msedge",
@@ -218,7 +218,7 @@ async function main() {
     context = await chromium.launchPersistentContext(PROFILE_DIR, {
       channel: "msedge",
       headless: true,
-      args: ["--disable-blink-features=AutomationControlled", "--headless=new"],
+      args: ["--disable-blink-features=AutomationControlled"],
       viewport: { width: 400, height: 300 }
     });
     headless = true;
