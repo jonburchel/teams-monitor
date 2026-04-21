@@ -234,9 +234,9 @@
   <pre id="mermaid-source" style="display:none;">
 graph TD
     Teams["☁️ Microsoft Teams\nMy Agents Team"]
-    Browser["🌐 Browser Watcher\nReads sidebar badges every 2s\nNo clicking · preserves unread"]
+    Browser["🌐 Browser Watcher\nMutationObserver per channel tab\nPush detection · no polling"]
 
-    Teams -->|"sidebar DOM"| Browser
+    Teams -->|"DOM push"| Browser
 
     subgraph Infra["Shared Infrastructure"]
         MCP["🔌 Agency Teams MCP\nHTTP Proxy · port 58410"]
@@ -287,7 +287,7 @@ graph TD
     style M3 fill:#553c00,stroke:#d69e2e,color:#fefcbf
   </pre>
   <p style="color: var(--text-muted); font-size: 0.9em; margin-top: 12px; text-align: center;">
-    <strong>Three-tier detection:</strong> Browser watcher reads sidebar badges (2s) → triggers fast polling (3s) in bridge MCPs → Graph API fetches actual message content.<br>
+    <strong>Three-tier detection:</strong> Browser watcher injects MutationObserver per channel (instant push) → triggers fast polling (3s) in bridge MCPs → Graph API fetches actual message content.<br>
     No channel clicking. Unread state preserved. Copilot sessions stay warm with persistent memory.
   </p>
 </div>
@@ -682,8 +682,8 @@ Jon asked for a brief PR description. Noted for future PRs.</code></pre>
     <div class="step-num">5</div>
     <div class="step-content">
       <h4>Browser watcher for near-instant detection</h4>
-      <p>Graph API has no push notifications for local clients. Pure polling meant 15s latency. Solution: a persistent Playwright browser reads the Teams sidebar unread badges every 2 seconds (without clicking channels, which would mark them as read). When a badge appears, the bridge switches to 3s fast polling. Detection dropped from 15s to ~2-3s with no external infrastructure.</p>
-      <p style="color: var(--text-muted); font-size: 0.9em; margin-top: 8px;">First attempt used channel-clicking, but Opus 4.7 review caught that this marks messages as read (UX regression) and DOM virtualization causes false positives. Rewritten to use sidebar badge reads only.</p>
+      <p>Graph API has no push notifications for local clients. Pure polling meant 15s latency. Solution: a persistent Playwright browser opens one tab per channel and injects a MutationObserver via <code>page.exposeFunction()</code>. When a new message DOM node appears, the browser calls directly into Node.js, which writes a notification file. The bridge reads this and switches to 3s fast polling for 30 seconds. Detection is near-instant with no polling overhead during idle periods.</p>
+      <p style="color: var(--text-muted); font-size: 0.9em; margin-top: 8px;">First attempt used sidebar badge reading, but Opus 4.7 review caught that the DOM selectors were unreliable. Second attempt used channel-clicking with message counting, but that marks channels as read (UX regression). Final approach: MutationObserver injected per-tab with <code>exposeFunction</code> callback. No polling. No clicking. True push.</p>
     </div>
   </div>
 

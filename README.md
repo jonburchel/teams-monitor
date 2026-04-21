@@ -11,9 +11,9 @@ Post a message in a Teams channel. Within seconds, a persistent AI agent respond
 ## Architecture
 
 ```
-Teams Web (sidebar badges)
+Teams Web (MutationObserver per channel)
      |
-     v (2s DOM reads, no clicking)
+     v (push via MutationObserver, no polling)
 Browser Watcher -----> Notification Files -----> Bridge MCPs (fast 3s poll)
                                                       |
 Teams Channels <---> Agency Teams MCP Proxy <---------+
@@ -24,7 +24,7 @@ Teams Channels <---> Agency Teams MCP Proxy <---------+
 ```
 
 **Three-tier detection:**
-1. **Browser watcher** reads Teams sidebar unread badges every 2 seconds (no channel clicking, preserves unread state)
+1. **Browser watcher** injects a MutationObserver into each channel tab via `page.exposeFunction()`. When a new message DOM node appears, it calls directly into Node.js (true push, no polling)
 2. **Bridge MCP** switches to 3s fast polling when watcher signals activity, 15s normal otherwise
 3. **Copilot sessions** call `check_messages()` continuously, process immediately with full context
 
