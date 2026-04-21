@@ -440,6 +440,44 @@ server.tool(
 );
 
 server.tool(
+  "post_channel_message",
+  "Post a new top-level message to your Teams channel (not a reply). Use for announcements like 'agent is online'.",
+  {
+    channelId: z.string().describe("Channel ID"),
+    channelName: z.string().describe("Channel name"),
+    messageText: z.string().describe("Message content (plain text)")
+  },
+  async ({ channelId, channelName, messageText }) => {
+    try {
+      const cardJson = JSON.stringify({
+        type: "AdaptiveCard", version: "1.4",
+        body: [
+          { type: "ColumnSet", columns: [
+            { type: "Column", width: "auto", items: [{ type: "Image", url: "https://img.icons8.com/fluency/48/robot-2.png", size: "Small" }] },
+            { type: "Column", width: "stretch", items: [
+              { type: "TextBlock", text: "Teams Monitor", weight: "Bolder", size: "Medium" },
+              { type: "TextBlock", text: channelName, isSubtle: true, spacing: "None", size: "Small" }
+            ]}
+          ]},
+          { type: "TextBlock", text: messageText, wrap: true }
+        ]
+      });
+
+      await mcpToolCall("PostChannelMessage", {
+        teamId: config.teamId, channelId,
+        content: "\u200B",
+        contentType: "html",
+        adaptiveCardJson: cardJson
+      });
+
+      return { content: [{ type: "text", text: JSON.stringify({ success: true }) }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: JSON.stringify({ success: false, error: e.message }) }] };
+    }
+  }
+);
+
+server.tool(
   "check_background_tasks",
   "Check if any background tasks are due. Returns task prompts or empty.",
   {},
