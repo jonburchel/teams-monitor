@@ -448,6 +448,14 @@ server.tool(
     }
     pendingLastSeen.length = 0;
 
+    // Fire-and-forget: acknowledge each message with a 👀 reaction so user sees "working on it"
+    for (const m of msgs) {
+      mcpToolCall("SetMessageReaction", {
+        teamId: config.teamId, channelId: m.channelId, messageId: m.messageId,
+        reactionType: "like"
+      }).catch(() => {}); // Silently ignore if reaction API unavailable
+    }
+
     return { content: [{ type: "text", text: JSON.stringify({
       newMessages: msgs.map(m => ({
         channel: m.channel, channelId: m.channelId, workDir: m.workDir,
@@ -461,7 +469,7 @@ server.tool(
 
 server.tool(
   "send_reply",
-  "Reply to a Teams channel message with Adaptive Card formatting. Also sends a self-DM notification.",
+  "Reply IN-THREAD to a specific Teams message. Posts an Adaptive Card reply, marks thread unread, and sends a self-DM. This is the ONLY tool for responding to user messages. NEVER use post_channel_message for responses.",
   {
     channelId: z.string().describe("Channel ID"),
     messageId: z.string().describe("Message ID to reply to"),
@@ -502,6 +510,12 @@ server.tool(
         content: `[Teams Monitor] ${channelName}: ${replyText.slice(0, 80)}...`
       }).catch(e => console.error(`${label} SendMessageToSelf failed: ${e.message}`));
 
+      // Fire-and-forget: remove the "like" acknowledgment reaction now that we've replied
+      mcpToolCall("RemoveMessageReaction", {
+        teamId: config.teamId, channelId, messageId,
+        reactionType: "like"
+      }).catch(() => {});
+
       // Fire-and-forget: mark thread as unread via deterministic Playwright automation
       // This runs in the background and never blocks the main loop
       markThreadUnread(channelId, config.teamId, channelName, replyText.slice(0, 60))
@@ -520,7 +534,7 @@ server.tool(
 
 server.tool(
   "post_channel_message",
-  "Post a new top-level message to your Teams channel (not a reply). Use for announcements like 'agent is online'.",
+  "Post a new TOP-LEVEL message (NOT a reply). ONLY use this for the startup hello announcement. NEVER use this to respond to a user message; use send_reply instead.",
   {
     channelId: z.string().describe("Channel ID"),
     channelName: z.string().describe("Channel name"),
