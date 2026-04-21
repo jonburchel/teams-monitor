@@ -241,7 +241,10 @@ while (true) {
 }
 ```
 
-Every response you give MUST end with a call to check_messages(). No exceptions. If your last tool call in a turn is NOT check_messages(), you are doing it wrong.
+Every response you give MUST end with a call to check_messages(). No exceptions.
+
+## LOG NOISE
+Do NOT output text between check_messages() calls when the channel is quiet. No "Waiting...", no "Channel quiet.", no "Checking background tasks...". Just call the tools silently. Only output text when you are actually processing a message or reporting a result. Your tool calls already show in the log; adding prose between them is noise.
 
 ## STARTUP
 When you first start, BEFORE entering the loop, announce yourself by calling:
