@@ -1,14 +1,12 @@
 /**
- * teams-watcher.mjs - Persistent browser watcher for Teams push notifications.
+ * teams-watcher.mjs - True push detection via MutationObserver.
  * 
- * Keeps a headed Edge browser open on the Teams Activity feed.
- * Monitors the sidebar unread badges for channel activity without
- * clicking channels (which would mark them as read).
+ * Opens Teams in a persistent Edge browser with one tab per channel.
+ * Injects a MutationObserver into each tab that fires a callback
+ * into Node.js the instant a new message DOM node appears.
+ * Writes notification files that the bridge reads for instant polling.
  * 
- * Writes notification files that the bridge reads for instant detection.
- * 
- * Usage: node teams-watcher.mjs
- * Started automatically by start-agents.ps1.
+ * NO POLLING. The browser pushes to us.
  */
 
 import { chromium } from "playwright";
@@ -31,95 +29,158 @@ function notifyFile(channelName) {
   return join(NOTIFY_DIR, `${channelName.replace(/[^a-zA-Z0-9]/g, '_')}.notify`);
 }
 
+async function setupChannelTab(context, channel, teamId) {
+  const page = await context.newPage();
+  page.setDefaultTimeout(30000);
+
+  // Expose a function the browser can call to notify us
+  await page.exposeFunction('__teamsMonitorNotify', (channelName) => {
+    console.error(`[watcher] PUSH: New activity in ${channelName}`);
+    writeFileSync(notifyFile(channelName), JSON.stringify({
+      channel: channelName,
+      detectedAt: new Date().toISOString(),
+      source: "mutation-observer"
+    }));
+  });
+
+  // Navigate to Teams
+  console.error(`[watcher] Opening tab for ${channel.name}...`);
+  await page.goto("https://teams.cloud.microsoft", { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(8000);
+
+  // Wait for Teams to load
+  try {
+    await page.waitForSelector('nav[aria-label="Apps"]', { timeout: 30000 });
+  } catch {
+    console.error(`[watcher] ${channel.name}: Waiting for auth (first run). Sign in manually.`);
+    await page.waitForSelector('nav[aria-label="Apps"]', { timeout: 120000 });
+  }
+
+  // Navigate to the channel via sidebar
+  try {
+    const myAgents = page.getByRole("treeitem", { name: config.team || "My Agents" });
+    await myAgents.click();
+    await page.waitForTimeout(2000);
+
+    // Look for the channel name in the expanded tree
+    const channelEl = page.getByText(channel.name, { exact: true }).first();
+    await channelEl.click();
+    await page.waitForTimeout(3000);
+
+    // Verify we're on the right channel
+    const title = await page.title();
+    console.error(`[watcher] ${channel.name}: On page "${title}"`);
+  } catch (e) {
+    console.error(`[watcher] ${channel.name}: Navigation failed: ${e.message}. Tab will retry on reload.`);
+  }
+
+  // Inject MutationObserver that watches for new message nodes
+  const channelName = channel.name;
+  await page.evaluate((chName) => {
+    // Find the message container (Teams uses various structures)
+    function findMessageContainer() {
+      // Try common Teams message list selectors
+      const candidates = [
+        document.querySelector('[data-tid="message-pane-list-items"]'),
+        document.querySelector('[role="main"] [role="list"]'),
+        document.querySelector('[data-tid="chat-pane-message"]')?.parentElement,
+        // Fallback: the largest scrollable div in the main content area
+        ...Array.from(document.querySelectorAll('[role="main"] div')).filter(el => el.scrollHeight > el.clientHeight && el.children.length > 3)
+      ];
+      return candidates.find(el => el) || document.querySelector('[role="main"]');
+    }
+
+    let container = findMessageContainer();
+    let debounceTimer = null;
+
+    function startObserving(target) {
+      if (!target) return;
+      const observer = new MutationObserver((mutations) => {
+        // Debounce: multiple mutations fire at once when a message arrives
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          // Check if any added nodes look like messages (not just UI chrome)
+          for (const m of mutations) {
+            for (const node of m.addedNodes) {
+              if (node.nodeType === 1 && node.textContent && node.textContent.trim().length > 5) {
+                window.__teamsMonitorNotify(chName);
+                return;
+              }
+            }
+          }
+        }, 500); // 500ms debounce to batch rapid mutations
+      });
+
+      observer.observe(target, { childList: true, subtree: true });
+      console.log(`[teams-watcher] MutationObserver active for ${chName} on`, target.tagName, target.className?.slice(0, 50));
+    }
+
+    startObserving(container);
+
+    // Re-find container periodically in case Teams rebuilds the DOM
+    setInterval(() => {
+      const newContainer = findMessageContainer();
+      if (newContainer && newContainer !== container) {
+        console.log(`[teams-watcher] Container changed for ${chName}, re-attaching observer`);
+        container = newContainer;
+        startObserving(container);
+      }
+    }, 10000);
+  }, channelName);
+
+  console.error(`[watcher] ${channel.name}: MutationObserver injected. Listening for push events.`);
+  return page;
+}
+
 async function main() {
-  console.error("[watcher] Starting persistent Teams browser (Activity feed mode)...");
+  console.error("[watcher] Starting Teams browser with MutationObserver push detection...");
 
   const context = await chromium.launchPersistentContext(PROFILE_DIR, {
     channel: "msedge",
     headless: false,
     args: [
       "--disable-blink-features=AutomationControlled",
-      "--window-size=400,600",
+      "--window-size=400,300",
       "--window-position=9999,9999"
     ],
-    viewport: { width: 400, height: 600 }
+    viewport: { width: 400, height: 300 }
   });
 
-  const page = context.pages()[0] || await context.newPage();
-  page.setDefaultTimeout(30000);
+  // Close the default blank tab
+  const defaultPage = context.pages()[0];
 
-  console.error("[watcher] Navigating to Teams...");
-  await page.goto("https://teams.cloud.microsoft", { waitUntil: "domcontentloaded" });
-
-  try {
-    await page.waitForSelector('nav[aria-label="Apps"]', { timeout: 30000 });
-    console.error("[watcher] Teams loaded and authenticated.");
-  } catch {
-    console.error("[watcher] Waiting for manual auth (first run). Sign in in the browser window.");
-    console.error("[watcher] TIP: Move the browser window from off-screen (it starts at 9999,9999).");
-    await page.waitForSelector('nav[aria-label="Apps"]', { timeout: 120000 });
-    console.error("[watcher] Auth complete. Moving window off-screen.");
+  const pages = [];
+  for (const channel of config.channels) {
+    try {
+      const page = await setupChannelTab(context, channel, config.teamId);
+      pages.push({ channel: channel.name, page });
+    } catch (e) {
+      console.error(`[watcher] Failed to set up ${channel.name}: ${e.message}`);
+    }
   }
 
-  // Build channel name lookup
-  const channelNames = config.channels.map(c => c.name.toLowerCase());
+  // Close the original blank tab
+  if (defaultPage && defaultPage !== pages[0]?.page) {
+    try { await defaultPage.close(); } catch {}
+  }
 
-  // Track what we've already notified about
-  const notifiedActivity = new Set();
+  console.error(`[watcher] All ${pages.length} channels active. Waiting for push events (no polling).`);
 
-  console.error("[watcher] Monitoring sidebar unread badges. Not clicking channels (preserves unread state).");
-
+  // Keep alive + handle page crashes
   while (true) {
-    try {
-      // Read the sidebar for unread indicators without clicking anything
-      // Teams sidebar shows channel names with "Unread" badges
-      const unreadChannels = await page.evaluate((names) => {
-        const results = [];
-        // Look for tree items with "Unread" in their accessible name
-        const items = document.querySelectorAll('[role="treeitem"]');
-        for (const item of items) {
-          const label = (item.getAttribute("aria-label") || item.textContent || "").toLowerCase();
-          if (!label.includes("unread")) continue;
-          // Check if this matches one of our channel names
-          for (const name of names) {
-            if (label.includes(name)) {
-              results.push(name);
-              break;
-            }
-          }
+    await new Promise(r => setTimeout(r, 30000));
+
+    for (const p of pages) {
+      try {
+        if (p.page.isClosed()) {
+          console.error(`[watcher] ${p.channel} tab closed. Reopening...`);
+          const ch = config.channels.find(c => c.name === p.channel);
+          if (ch) p.page = await setupChannelTab(context, ch, config.teamId);
         }
-        return results;
-      }, channelNames);
-
-      for (const channelLower of unreadChannels) {
-        const channel = config.channels.find(c => c.name.toLowerCase() === channelLower);
-        if (!channel) continue;
-
-        // Create a unique key for this detection (channel + minute to debounce)
-        const key = `${channel.name}-${Math.floor(Date.now() / 60000)}`;
-        if (notifiedActivity.has(key)) continue;
-        notifiedActivity.add(key);
-
-        // Bound the set
-        if (notifiedActivity.size > 200) {
-          const arr = [...notifiedActivity];
-          notifiedActivity.clear();
-          arr.slice(-100).forEach(k => notifiedActivity.add(k));
-        }
-
-        console.error(`[watcher] Unread detected: ${channel.name}`);
-        writeFileSync(notifyFile(channel.name), JSON.stringify({
-          channel: channel.name,
-          detectedAt: new Date().toISOString(),
-          source: "sidebar-badge"
-        }));
+      } catch (e) {
+        console.error(`[watcher] ${p.channel} health check error: ${e.message}`);
       }
-    } catch (e) {
-      console.error(`[watcher] Scan error: ${e.message}`);
     }
-
-    // Check every 2 seconds (lightweight DOM read, no navigation)
-    await page.waitForTimeout(2000);
   }
 }
 
