@@ -49,9 +49,9 @@ teams-monitor/
   background-tasks.json         # Scheduled automations
   auth.cmd                      # One-time MCP auth
   teams-bridge/
-    index.mjs                   # Bridge MCP: polls, queues, replies, thread tracking
+    index.mjs                   # Bridge MCP: polls, queues, replies, thread tracking, auto-mark-unread
+    mark-unread.mjs             # Deterministic Playwright module: persistent browser, direct URL nav, pre-researched selectors
     teams-watcher.mjs           # Browser watcher (experimental, not used in default flow)
-    mark-unread.mjs             # Standalone mark-unread script (not used; agents use Playwright MCP directly)
   .agents/
     charter-source/             # Agent charters per channel
     memory/                     # Persistent agent memory (committed to git)
