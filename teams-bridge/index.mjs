@@ -22,7 +22,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { spawn } from "node:child_process";
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -76,26 +76,9 @@ let pollTimer = null;
 let seenIds = new Set(); // dedup by message ID
 let activeThreads = new Map(); // root message ID -> { channelId, channelName, lastActivity: ISO timestamp }
 
-const POLL_INTERVAL = 15000;
-const FAST_POLL_INTERVAL = 3000; // used when watcher detects activity
-const NOTIFY_DIR = join(ROOT, ".agents", "state", "notifications");
 const label = myChannel ? `[${myChannel.name}]` : "[all]";
-let fastPollUntil = 0; // timestamp: fast-poll until this time
 
-// Check if the browser watcher flagged new activity for our channel
-function checkWatcherNotification() {
-  if (!myChannel) return false;
-  const nFile = join(NOTIFY_DIR, `${myChannel.name.replace(/[^a-zA-Z0-9]/g, '_')}.notify`);
-  try {
-    if (existsSync(nFile)) {
-      const data = JSON.parse(readFileSync(nFile, "utf-8"));
-      try { unlinkSync(nFile); } catch {}
-      console.error(`${label} Watcher notification: new activity detected`);
-      return true;
-    }
-  } catch {}
-  return false;
-}
+const POLL_INTERVAL = 5000; // 5 seconds - fast enough for conversational feel, no browser needed
 
 // --- Teams MCP HTTP proxy ---
 
@@ -503,17 +486,11 @@ server.tool(
 
 // --- Main ---
 
-// Adaptive polling: fast (3s) when watcher signals activity, normal (15s) otherwise
 function schedulePoll() {
-  const hasNotification = checkWatcherNotification();
-  if (hasNotification) fastPollUntil = Date.now() + 30000; // burst for 30s
-  const isFast = Date.now() < fastPollUntil;
-  const interval = isFast ? FAST_POLL_INTERVAL : POLL_INTERVAL;
-
   pollTimer = setTimeout(async () => {
     await poll();
     schedulePoll();
-  }, interval);
+  }, POLL_INTERVAL);
 }
 
 async function main() {

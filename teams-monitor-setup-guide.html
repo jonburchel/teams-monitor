@@ -123,7 +123,7 @@
     <div class="feature-card">
       <div class="emoji">💬</div>
       <h4>Chat in Teams</h4>
-      <p>Post a message in your Teams channel. A persistent AI agent picks it up instantly via browser push detection, with 15s API polling as fallback and responds in-thread with a styled Adaptive Card.</p>
+      <p>Post a message in your Teams channel. A persistent AI agent picks it up within ~5-8 seconds and responds in-thread with a styled Adaptive Card and responds in-thread with a styled Adaptive Card.</p>
     </div>
     <div class="feature-card">
       <div class="emoji">🧠</div>
@@ -234,45 +234,35 @@
   <pre id="mermaid-source" style="display:none;">
 graph TD
     Teams["☁️ Microsoft Teams\nMy Agents Team"]
-    Browser["🌐 Browser Watcher\nMutationObserver per channel tab\nPush detection · no polling"]
-
-    Teams -->|"DOM push"| Browser
 
     subgraph Infra["Shared Infrastructure"]
-        MCP["🔌 Agency Teams MCP\nHTTP Proxy · default port 58410"]
-        Notify["📁 Notification Files\ntrigger fast polling"]
+        MCP["🔌 Agency Teams MCP\nHTTP Proxy"]
     end
 
-    Browser -->|"push on new message"| Notify
     Teams <-->|"Graph API"| MCP
 
     subgraph Session1["Fabric Docs Agent"]
-        B1["🌉 Bridge MCP\n15s normal · 3s when notified"] --> S1["🤖 Copilot Session\npersistent"]
+        B1["🌉 Bridge MCP\n5s poll"] --> S1["🤖 Copilot Session\npersistent"]
         S1 --> M1["📝 Memory"]
     end
 
     subgraph Session2["Foundry Docs Agent"]
-        B2["🌉 Bridge MCP\n15s normal · 3s when notified"] --> S2["🤖 Copilot Session\npersistent"]
+        B2["🌉 Bridge MCP\n5s poll"] --> S2["🤖 Copilot Session\npersistent"]
         S2 --> M2["📝 Memory"]
     end
 
     subgraph Session3["Home Agent"]
-        B3["🌉 Bridge MCP\n15s normal · 3s when notified"] --> S3["🤖 Copilot Session\npersistent"]
+        B3["🌉 Bridge MCP\n5s poll"] --> S3["🤖 Copilot Session\npersistent"]
         S3 --> M3["📝 Memory"]
     end
 
-    MCP --> B1
-    MCP --> B2
-    MCP --> B3
-    Notify -.->|"fast poll"| B1
-    Notify -.->|"fast poll"| B2
-    Notify -.->|"fast poll"| B3
+    MCP -->|"5s poll"| B1
+    MCP -->|"5s poll"| B2
+    MCP -->|"5s poll"| B3
 
     style Teams fill:#1a365d,stroke:#2b6cb0,color:#bee3f8
-    style Browser fill:#553c00,stroke:#d69e2e,color:#fefcbf
     style Infra fill:#161b22,stroke:#30363d,color:#e2e8f0
     style MCP fill:#2d3748,stroke:#4a5568,color:#e2e8f0
-    style Notify fill:#2d3748,stroke:#d69e2e,color:#fefcbf
     style Session1 fill:#1c2333,stroke:#38a169,color:#c6f6d5
     style Session2 fill:#1c2333,stroke:#38a169,color:#c6f6d5
     style Session3 fill:#1c2333,stroke:#38a169,color:#c6f6d5
@@ -610,7 +600,7 @@ Register-ScheduledTask -TaskName "TeamsMonitor" -TaskPath "\" `
     <tr><td><code>background-tasks.json</code></td><td>Scheduled automations (calendar guard, email digest)</td></tr>
     <tr><td><code>auth.cmd</code></td><td>One-time MCP OAuth sign-in (opens browser)</td></tr>
     <tr><td><code>teams-bridge/index.mjs</code></td><td>Teams Bridge MCP: polls proxy, queues messages, posts Adaptive Card replies, tracks threads</td></tr>
-    <tr><td><code>teams-bridge/teams-watcher.mjs</code></td><td>Browser watcher: MutationObserver push detection (one tab per channel, no polling)</td></tr>
+    <tr><td><code>teams-bridge/teams-watcher.mjs</code></td><td>Browser watcher (experimental, not used in default flow)</td></tr>
     <tr><td><code>.agents/charter-source/</code></td><td>Agent charters: identity, expertise, channel-specific instructions</td></tr>
     <tr><td><code>.agents/memory/</code></td><td>Persistent agent memory: decisions, learnings, context across sessions (committed to git)</td></tr>
     <tr><td><code>.agents/state/</code></td><td>Runtime state: last-seen cursors, lock file, notifications (gitignored)</td></tr>
@@ -681,7 +671,7 @@ Jon asked for a brief PR description. Noted for future PRs.</code></pre>
   <div class="step">
     <div class="step-num">5</div>
     <div class="step-content">
-      <h4>Browser watcher for near-instant detection</h4>
+      <h4>Fast 5-second polling (browser watcher experimental)</h4>
       <p>Graph API has no push notifications for local clients. Pure polling meant 15s latency. Solution: a persistent Playwright browser opens one tab per channel and injects a MutationObserver via <code>page.exposeFunction()</code>. When a new message DOM node appears, the browser calls directly into Node.js, which writes a notification file. The bridge reads this and switches to 3s fast polling for 30 seconds. Detection is near-instant with no polling overhead during idle periods.</p>
       <p style="color: var(--text-muted); font-size: 0.9em; margin-top: 8px;">First attempt used sidebar badge reading, but Opus 4.7 review caught that the DOM selectors were unreliable. Second attempt used channel-clicking with message counting, but that marks channels as read (UX regression). Final approach: MutationObserver injected per-tab with <code>exposeFunction</code> callback. No polling. No clicking. True push.</p>
     </div>

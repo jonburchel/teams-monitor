@@ -11,24 +11,18 @@ Post a message in a Teams channel. Within seconds, a persistent AI agent respond
 ## Architecture
 
 ```
-Teams Web (MutationObserver per channel)
-     |
-     v (push via MutationObserver, no polling)
-Browser Watcher -----> Notification Files -----> Bridge MCPs (fast 3s poll)
-                                                      |
-Teams Channels <---> Agency Teams MCP Proxy <---------+
-                     (port 58410)                     |
-                                                      v
-                                              Copilot Sessions (persistent)
-                                              + Agent Memory (.md files)
+Teams Channels <---> Agency Teams MCP HTTP Proxy (default port 58410)
+                          |
+                          |---> Bridge MCP (Fabric Docs, 5s poll) ---> Copilot Session
+                          |---> Bridge MCP (Foundry Docs, 5s poll) --> Copilot Session
+                          +---> Bridge MCP (Home, 5s poll) ----------> Copilot Session
+                                    |
+                                    +--> Agent Memory (.md files)
 ```
 
-**Three-tier detection:**
-1. **Browser watcher** injects a MutationObserver into each channel tab via `page.exposeFunction()`. When a new message DOM node appears, it calls directly into Node.js (true push, no polling)
-2. **Bridge MCP** switches to 3s fast polling when watcher signals activity, 15s normal otherwise
-3. **Copilot sessions** call `check_messages()` continuously, process immediately with full context
+**How it works:** Each channel gets a per-channel Bridge MCP (Node.js) that polls the shared Teams MCP proxy every 5 seconds via direct HTTP. When a new message is detected, the bridge queues it and the persistent Copilot session picks it up on its next `check_messages()` call. Total detection time: ~5-8 seconds.
 
-**Why not just Graph API webhooks?** Requires a public HTTPS endpoint. **Why not just poll?** 15s is too slow for conversational feel. The browser watcher bridges the gap without external infrastructure.
+**Why not Graph webhooks?** Requires a public HTTPS endpoint. **Why not a browser watcher?** 15s is too slow for conversational feel. The browser watcher bridges the gap without external infrastructure.
 
 Design validated by independent Claude Opus 4.7 architecture reviews at multiple stages.
 
@@ -56,7 +50,7 @@ teams-monitor/
   auth.cmd                      # One-time MCP auth
   teams-bridge/
     index.mjs                   # Bridge MCP: polls, queues, replies, thread tracking
-    teams-watcher.mjs           # Browser watcher: MutationObserver push detection
+    teams-watcher.mjs           # Browser watcher (experimental, not used in default flow)
     mark-unread.mjs             # Playwright mark-unread (experimental)
   .agents/
     charter-source/             # Agent charters per channel

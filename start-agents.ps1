@@ -124,15 +124,8 @@ $mcpProc = Start-Process -FilePath $agencyExe `
 Write-Host "[$(Get-Date -Format 'HH:mm:ss')] MCP proxy PID: $($mcpProc.Id). Waiting for startup..."
 Start-Sleep -Seconds 10
 
-# Step 1b: Start the persistent Teams browser watcher (push detection via MutationObserver)
-$watcherScript = Join-Path $bridgeDir "teams-watcher.mjs"
+# Step 1b: Watcher is built into the bridge (fast 5s internal polling, no browser needed)
 $watcherProc = $null
-if (Test-Path $watcherScript) {
-    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Starting Teams browser watcher..."
-    $watcherProc = Start-Process -FilePath $nodeExe -ArgumentList @($watcherScript) `
-        -PassThru -NoNewWindow -WorkingDirectory $scriptDir
-    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Watcher PID: $($watcherProc.Id)"
-}
 
 # Step 2: Generate per-channel MCP config and prompt, then launch sessions
 $sessions = @()
