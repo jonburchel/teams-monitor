@@ -14,7 +14,6 @@
  * Tools exposed:
  *   check_messages()      - Returns new messages for THIS channel only
  *   send_reply(...)       - Posts a reply via Teams MCP with Adaptive Card
- *   mark_unread(...)      - Returns Playwright instructions for mark-as-unread
  *   check_background_tasks() - Returns due scheduled tasks
  */
 

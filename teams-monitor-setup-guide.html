@@ -123,7 +123,7 @@
     <div class="feature-card">
       <div class="emoji">💬</div>
       <h4>Chat in Teams</h4>
-      <p>Post a message in your Teams channel. A persistent AI agent picks it up within ~5-8 seconds and responds in-thread with a styled Adaptive Card and responds in-thread with a styled Adaptive Card.</p>
+      <p>Post a message in your Teams channel. A persistent AI agent picks it up within ~5-8 seconds and responds in-thread with a styled Adaptive Card.</p>
     </div>
     <div class="feature-card">
       <div class="emoji">🧠</div>
@@ -345,7 +345,7 @@ graph TD
       <p><strong>Get your Team ID and Channel IDs.</strong> Use the config generator below, or run this command to discover them:</p>
       <div class="code-block">
         <div class="header"><span>PowerShell</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
-        <pre><code>agency copilot --mcp teams -- --yolo --model claude-haiku-4.5 -p "List all teams and their channels. Show team IDs and channel IDs."</code></pre>
+        <pre><code>agency copilot --mcp teams --yolo --model claude-haiku-4.5 -p "List all teams and their channels. Show team IDs and channel IDs."</code></pre>
       </div>
     </div>
   </div>
@@ -365,7 +365,7 @@ graph TD
       <p style="color: var(--text-muted); font-size: 0.9em; margin-top: 8px;">Or run this command to auto-discover all your teams and channels:</p>
       <div class="code-block">
         <div class="header"><span>PowerShell</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
-        <pre><code>agency copilot --mcp teams -- --yolo --model claude-haiku-4.5 -p "List all my teams with their IDs, and for each team list all channels with their IDs. Output as a table."</code></pre>
+        <pre><code>agency copilot --mcp teams --yolo --model claude-haiku-4.5 -p "List all my teams with their IDs, and for each team list all channels with their IDs. Output as a table."</code></pre>
       </div>
     </div>
 
@@ -672,8 +672,7 @@ Jon asked for a brief PR description. Noted for future PRs.</code></pre>
     <div class="step-num">5</div>
     <div class="step-content">
       <h4>Fast 5-second polling (browser watcher experimental)</h4>
-      <p>Graph API has no push notifications for local clients. Pure polling meant 15s latency. Solution: a persistent Playwright browser opens one tab per channel and injects a MutationObserver via <code>page.exposeFunction()</code>. When a new message DOM node appears, the browser calls directly into Node.js, which writes a notification file. The bridge reads this and switches to 3s fast polling for 30 seconds. Detection is near-instant with no polling overhead during idle periods.</p>
-      <p style="color: var(--text-muted); font-size: 0.9em; margin-top: 8px;">First attempt used sidebar badge reading, but Opus 4.7 review caught that the DOM selectors were unreliable. Second attempt used channel-clicking with message counting, but that marks channels as read (UX regression). Final approach: MutationObserver injected per-tab with <code>exposeFunction</code> callback. No polling. No clicking. True push.</p>
+      <p>Graph API has no push notifications for local clients. Pure polling meant 15s latency. Solution: We explored browser-based push detection via Playwright MutationObserver, but Teams' SPA DOM proved too fragile for reliable headless monitoring. Instead, we settled on 5-second direct API polling via the shared MCP proxy, which provides ~5-8s detection time with zero browser overhead.</p>
     </div>
   </div>
 
@@ -687,7 +686,7 @@ Jon asked for a brief PR description. Noted for future PRs.</code></pre>
 
   <div class="card" style="border-color: var(--purple);">
     <h4 style="color: var(--purple);">Key insight: Graph API limitations drove every design decision</h4>
-    <p>Microsoft Graph API cannot push-notify local clients (requires public HTTPS endpoint) and cannot mark messages as unread (no API exists). These constraints forced the three-tier architecture: browser watcher for fast detection, bridge MCP for message handling, persistent Copilot sessions for processing. Each tier works around a specific platform limitation without requiring external infrastructure.</p>
+    <p>Microsoft Graph API cannot push-notify local clients (requires public HTTPS endpoint) and cannot mark messages as unread (no API exists). These constraints forced the two-tier architecture: Bridge MCPs for message detection and handling (5s polling), and persistent Copilot sessions for processing. Each tier works around a specific platform limitation without requiring external infrastructure.</p>
   </div>
 </div>
 

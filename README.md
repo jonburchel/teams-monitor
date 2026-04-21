@@ -22,7 +22,7 @@ Teams Channels <---> Agency Teams MCP HTTP Proxy (default port 58410)
 
 **How it works:** Each channel gets a per-channel Bridge MCP (Node.js) that polls the shared Teams MCP proxy every 5 seconds via direct HTTP. When a new message is detected, the bridge queues it and the persistent Copilot session picks it up on its next `check_messages()` call. Total detection time: ~5-8 seconds.
 
-**Why not Graph webhooks?** Requires a public HTTPS endpoint. **Why not a browser watcher?** 15s is too slow for conversational feel. The browser watcher bridges the gap without external infrastructure.
+**Why not Graph webhooks?** Requires a public HTTPS endpoint. **Why not a browser?** Teams' SPA DOM is fragile and headless Edge is unreliable for long-running monitoring.
 
 Design validated by independent Claude Opus 4.7 architecture reviews at multiple stages.
 
@@ -37,7 +37,7 @@ cp workflow.config.example.json workflow.config.json  # edit with your IDs
 .\start-agents.ps1 -AutoUpdate  # with auto-pull from git
 ```
 
-The browser watcher runs headless by default. If cached auth is missing (first run or token expiry), it opens a visible Edge window for sign-in, then switches back to headless automatically.
+The watcher module (teams-watcher.mjs) is experimental and not used in the default flow.
 
 ## Files
 
