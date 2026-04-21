@@ -25,12 +25,18 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
+let ServiceBusClient;
+try {
+  const sb = await import("@azure/service-bus");
+  ServiceBusClient = sb.ServiceBusClient;
+} catch { /* Service Bus not installed, will use Graph API polling fallback */ }
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
 const CONFIG_PATH = join(ROOT, "workflow.config.json");
 const LAST_SEEN_PATH = join(ROOT, ".agents", "state", "last-seen.json");
 const BG_TASKS_PATH = join(ROOT, "background-tasks.json");
-// AGENCY_EXE removed - proxy started externally by start-agents.ps1
+const SB_CONN_FILE = join(ROOT, ".agents", "state", "servicebus-connection.txt");
 const STATE_DIR = join(ROOT, ".agents", "state");
 
 // Parse args
@@ -74,10 +80,58 @@ let bgTaskSchedule = {}; // taskId -> nextDueAt (wall clock)
 let pollTimer = null;
 let seenIds = new Set(); // dedup by message ID
 let activeThreads = new Map(); // root message ID -> { channelId, channelName, lastActivity: ISO timestamp }
+let sbReceiver = null; // Service Bus receiver (if configured)
+let usePushMode = false; // true when Service Bus is active
 
 const label = myChannel ? `[${myChannel.name}]` : "[all]";
 
-const POLL_INTERVAL = 5000; // 5 seconds - fast enough for conversational feel, no browser needed
+// Push mode: 500ms queue check. Fallback: 5s Graph API poll.
+const POLL_INTERVAL_PUSH = 500;
+const POLL_INTERVAL_FALLBACK = 5000;
+
+// --- Service Bus setup ---
+
+async function initServiceBus() {
+  if (!ServiceBusClient) return false;
+  
+  let connStr;
+  try {
+    connStr = readFileSync(SB_CONN_FILE, "utf-8").trim();
+  } catch {
+    console.error(`${label} No Service Bus connection string at ${SB_CONN_FILE}. Using Graph API polling.`);
+    return false;
+  }
+
+  try {
+    const client = new ServiceBusClient(connStr);
+    sbReceiver = client.createReceiver("teams-messages", { receiveMode: "receiveAndDelete" });
+    console.error(`${label} Service Bus connected. Push mode active.`);
+    return true;
+  } catch (e) {
+    console.error(`${label} Service Bus init failed: ${e.message}. Using Graph API polling.`);
+    return false;
+  }
+}
+
+// Check Service Bus queue for push notifications from Azure Function
+async function checkServiceBus() {
+  if (!sbReceiver) return [];
+
+  try {
+    const messages = await sbReceiver.receiveMessages(10, { maxWaitTimeInMs: 200 });
+    return messages
+      .filter(m => m.body?.type === "message")
+      .filter(m => {
+        // Filter to our channel if we have one
+        if (!myChannel) return true;
+        return m.body.channelId === myChannel.channelId;
+      })
+      .map(m => m.body);
+  } catch (e) {
+    console.error(`${label} Service Bus receive error: ${e.message}`);
+    return [];
+  }
+}
 
 // --- Teams MCP HTTP proxy ---
 
@@ -184,6 +238,50 @@ function isOwnReply(body) {
 async function poll() {
   if (!mcpInitialized) return;
 
+  // In push mode, check Service Bus first for instant notifications
+  if (usePushMode) {
+    const sbMessages = await checkServiceBus();
+    for (const sbMsg of sbMessages) {
+      if (seenIds.has(sbMsg.messageId)) continue;
+      seenIds.add(sbMsg.messageId);
+
+      // We got a notification that a new message exists. Fetch it via Graph API.
+      const channel = config.channels.find(c => c.channelId === sbMsg.channelId) || myChannel;
+      if (!channel) continue;
+
+      try {
+        const result = await mcpToolCall("ListChannelMessages", {
+          teamId: config.teamId,
+          channelId: channel.channelId
+        });
+        const textContent = result?.result?.content?.find(c => c.type === "text")?.text;
+        if (textContent) {
+          const messages = JSON.parse(textContent).messages || [];
+          const msg = messages.find(m => m.id === sbMsg.messageId);
+          if (msg && msg.from) {
+            const bodyText = msg.body?.content || "";
+            const stripped = stripHtml(bodyText);
+            if (stripped && !isOwnReply(bodyText)) {
+              messageQueue.push({
+                channel: channel.name, channelId: channel.channelId,
+                workDir: channel.workingDirectory, secondaryDir: channel.secondaryDirectory || null,
+                messageId: msg.id, from: msg.from?.user?.displayName || "Unknown",
+                text: stripped, createdAt: msg.createdDateTime
+              });
+              pendingLastSeen.push({ channelId: channel.channelId, timestamp: msg.createdDateTime });
+              console.error(`${label} PUSH: ${msg.from?.user?.displayName}: ${stripped.slice(0, 60)}`);
+            }
+          }
+        }
+      } catch (e) {
+        console.error(`${label} Push fetch error: ${e.message}`);
+      }
+    }
+    // In push mode, still do a full poll every 30s as fallback (not every cycle)
+    if (Date.now() % 30000 > 1000) return;
+  }
+
+  // Fallback: full Graph API poll (runs every cycle in fallback mode, every ~30s in push mode)
   const channelsToPoll = myChannel ? [myChannel] : config.channels;
   const hardCutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
 
@@ -486,10 +584,11 @@ server.tool(
 // --- Main ---
 
 function schedulePoll() {
+  const interval = usePushMode ? POLL_INTERVAL_PUSH : POLL_INTERVAL_FALLBACK;
   pollTimer = setTimeout(async () => {
     await poll();
     schedulePoll();
-  }, POLL_INTERVAL);
+  }, interval);
 }
 
 async function main() {
@@ -502,7 +601,14 @@ async function main() {
     process.exit(1);
   }
 
-  // Start adaptive polling (fast when watcher signals, normal otherwise)
+  // Try Service Bus for push mode, fall back to Graph API polling
+  usePushMode = await initServiceBus();
+  if (usePushMode) {
+    console.error(`${label} PUSH MODE: Service Bus queue + 500ms check. Sub-second detection.`);
+  } else {
+    console.error(`${label} FALLBACK MODE: Graph API polling every 5s.`);
+  }
+
   await poll(); // initial
   schedulePoll();
 
