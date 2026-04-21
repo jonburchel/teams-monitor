@@ -51,7 +51,7 @@ teams-monitor/
   teams-bridge/
     index.mjs                   # Bridge MCP: polls, queues, replies, thread tracking
     teams-watcher.mjs           # Browser watcher (experimental, not used in default flow)
-    mark-unread.mjs             # Playwright mark-unread (experimental)
+    mark-unread.mjs             # Standalone mark-unread script (not used; agents use Playwright MCP directly)
   .agents/
     charter-source/             # Agent charters per channel
     memory/                     # Persistent agent memory (committed to git)

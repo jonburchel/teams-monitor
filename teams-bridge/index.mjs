@@ -166,7 +166,7 @@ async function initMcp() {
 
 // --- Polling ---
 
-function stripHtml(html) { return (html || "").replace(/<[^>]+>/g, "").trim(); }
+function stripHtml(html) { return (html || "").replace(/<[^>]+>/g, "").replace(/[\u200B\u200C\u200D\uFEFF]/g, "").trim(); }
 
 // Identify own replies by checking for bot markers in the raw HTML/card content
 // Uses structural markers (Adaptive Card JSON, HTML strong tag) not loose substring matches

@@ -686,7 +686,7 @@ Jon asked for a brief PR description. Noted for future PRs.</code></pre>
 
   <div class="card" style="border-color: var(--purple);">
     <h4 style="color: var(--purple);">Key insight: Graph API limitations drove every design decision</h4>
-    <p>Microsoft Graph API cannot push-notify local clients (requires public HTTPS endpoint) and cannot mark messages as unread (no API exists). These constraints forced the two-tier architecture: Bridge MCPs for message detection and handling (5s polling), and persistent Copilot sessions for processing. Each tier works around a specific platform limitation without requiring external infrastructure.</p>
+    <p>Microsoft Graph API cannot push-notify local clients (requires public HTTPS endpoint) and cannot mark messages as unread (no API exists). We work around the unread limitation by using the Playwright MCP to right-click and mark threads as unread in the Teams Web UI after each agent reply. These constraints forced the two-tier architecture: Bridge MCPs for message detection and handling (5s polling), and persistent Copilot sessions for processing. Each tier works around a specific platform limitation without requiring external infrastructure.</p>
   </div>
 </div>
 
