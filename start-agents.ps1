@@ -87,21 +87,27 @@ if ($hasUpdate -and $AutoUpdate) {
     $didUpdate = Apply-Update
     if ($didUpdate) {
         Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Restarting with updated code..."
+        # Clear stale lock so the restarted script doesn't think another instance is running
+        Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
         & $MyInvocation.MyCommand.Path -Model $Model -McpPort $McpPort -AutoUpdate
         exit 0
     }
-} elseif ($hasUpdate) {
+}elseif ($hasUpdate) {
     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Run with -AutoUpdate to apply automatically, or 'git pull' manually."
 }
 
-# Lock check
+# Lock check - verify it's actually another start-agents instance, not a stale PID
 if (Test-Path $lockFile) {
     $raw = [System.IO.File]::ReadAllText($lockFile).Trim()
     if ($raw) {
         $existing = Get-Process -Id $raw -ErrorAction SilentlyContinue
-        if ($existing) {
-            Write-Host "Another monitor is already running (PID $raw). Exiting."
-            exit 0
+        if ($existing -and $existing.ProcessName -eq "pwsh" -and $existing.Id -ne $PID) {
+            # Verify it's running start-agents.ps1 by checking its children for agency.exe
+            $children = Get-CimInstance Win32_Process | Where-Object { $_.ParentProcessId -eq [int]$raw -and $_.Name -eq "agency.exe" }
+            if ($children) {
+                Write-Host "Another monitor is already running (PID $raw). Exiting."
+                exit 0
+            }
         }
     }
 }
