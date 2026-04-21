@@ -24,7 +24,7 @@ import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-
+import { markSelfChatUnread } from "./graph-helpers.mjs";
 
 let ServiceBusClient;
 try {
@@ -497,11 +497,19 @@ server.tool(
         lastActivity: new Date().toISOString()
       });
 
-      // Fire-and-forget: send self-DM notification (wrapped to never interfere with poll)
-      setTimeout(() => {
-        mcpToolCall("SendMessageToSelf", {
-          content: `[Teams Monitor] ${channelName}: ${replyText.slice(0, 80)}...`
-        }).catch(e => console.error(`${label} Self-DM failed: ${e.message}`));
+      // Fire-and-forget: send self-DM notification, then mark chat as unread
+      setTimeout(async () => {
+        try {
+          await mcpToolCall("SendMessageToSelf", {
+            content: `[Teams Monitor] ${channelName}: ${replyText.slice(0, 80)}...`
+          });
+          // Mark the self-DM chat unread so the badge persists
+          const r = await markSelfChatUnread();
+          if (r.success) console.error(`${label} Self-DM sent + marked unread`);
+          else console.error(`${label} Self-DM sent, mark-unread skipped: ${r.error}`);
+        } catch (e) {
+          console.error(`${label} Self-DM failed: ${e.message}`);
+        }
       }, 500);
 
       return{ content: [{ type: "text", text: JSON.stringify({ success: true }) }] };

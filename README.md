@@ -46,6 +46,7 @@ teams-monitor/
   auth.cmd                      # One-time MCP auth
   teams-bridge/
     index.mjs                   # Bridge MCP: polls, queues, replies, thread tracking
+    graph-helpers.mjs            # Direct Graph API: mark self-chat unread
   .agents/
     charter-source/             # Agent charters per channel
     memory/                     # Persistent agent memory (committed to git)
