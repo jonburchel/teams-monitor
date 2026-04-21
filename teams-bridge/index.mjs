@@ -229,11 +229,8 @@ async function poll() {
         const bodyText = msg.body?.content || "";
         const stripped = stripHtml(bodyText);
 
-        // Track threads where we previously replied (even if the root msg is old)
+        // Skip our own messages entirely (don't track as active threads either)
         if (isOwnReply(bodyText)) {
-          if (!activeThreads.has(msg.id)) {
-            activeThreads.set(msg.id, { channelId: channel.channelId, channelName: channel.name, lastActivity: msg.createdDateTime });
-          }
           seenIds.add(msg.id);
           continue;
         }
