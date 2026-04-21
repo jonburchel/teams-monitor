@@ -229,7 +229,7 @@
 
 <!-- ARCHITECTURE -->
 <div class="section">
-  <h2><span class="num">1</span> Architecture</h2>
+  <h2><span class="num">0</span> Architecture</h2>
   <div id="mermaid-diagram" style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 30px; margin: 24px 0; text-align: center; overflow-x: auto;"></div>
   <pre id="mermaid-source" style="display:none;">
 graph TD
@@ -294,7 +294,7 @@ graph TD
 
 <!-- PREREQUISITES -->
 <div class="section">
-  <h2><span class="num">2</span> Prerequisites</h2>
+  <h2><span class="num">1</span> Prerequisites</h2>
   <div class="prereq-grid">
     <div class="prereq-item">
       <div class="icon">⚡</div>
@@ -326,7 +326,7 @@ graph TD
 
 <!-- TEAMS SETUP -->
 <div class="section">
-  <h2><span class="num">3</span> Teams Setup</h2>
+  <h2><span class="num">2</span> Teams Setup</h2>
 
   <div class="step">
     <div class="step-num">1</div>
@@ -363,28 +363,34 @@ graph TD
 
 <!-- CONFIG GENERATOR -->
 <div class="section">
-  <h2><span class="num">4</span> Configuration</h2>
+  <h2><span class="num">3</span> Configuration</h2>
   <p>Fill in your details and generate your <code>workflow.config.json</code>. Add or remove channels as needed.</p>
 
   <div class="config-generator">
     <h3>⚙️ Config Generator</h3>
+
+    <div class="card" style="margin-bottom: 20px; border-color: var(--accent);">
+      <h4 style="color: var(--accent);">💡 How to find your Team ID and Channel IDs</h4>
+      <p style="color: var(--text-muted); font-size: 0.9em;">Right-click your Team name in Teams → <strong>Get link to team</strong>. The URL contains your <code>groupId</code> (that's the Team ID). For channels, right-click a channel → <strong>Get link to channel</strong>. The <code>channel/19:...</code> part is the Channel ID.</p>
+      <p style="color: var(--text-muted); font-size: 0.9em; margin-top: 8px;">Or run this command to auto-discover all your teams and channels:</p>
+      <div class="code-block">
+        <div class="header"><span>PowerShell</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre><code>agency copilot --mcp teams -- --yolo --model claude-haiku-4.5 -p "List all my teams with their IDs, and for each team list all channels with their IDs. Output as a table."</code></pre>
+      </div>
+    </div>
+
     <div class="form-row">
       <div class="form-group">
         <label>Team Name</label>
         <input type="text" id="teamName" value="My Agents" placeholder="My Agents">
       </div>
       <div class="form-group">
-        <label>Team ID (GUID from Teams)</label>
+        <label>Team ID (GUID)</label>
         <input type="text" id="teamId" placeholder="73f369c3-a60a-45fb-866c-e78edd611b80">
       </div>
     </div>
 
-    <div id="channelList"></div>
-
-    <button class="btn btn-secondary" onclick="addChannel()" style="margin-top: 12px;">+ Add Channel</button>
-
-    <hr style="border-color: var(--border); margin: 24px 0;">
-
+    <h4 style="margin: 20px 0 8px; color: var(--text-muted);">Defaults (applied to all agents unless overridden)</h4>
     <div class="form-row">
       <div class="form-group"><label>Default Model</label>
         <select id="model">
@@ -394,10 +400,15 @@ graph TD
           <option value="claude-sonnet-4.6">Claude Sonnet 4.6</option>
         </select>
       </div>
-      <div class="form-group"><label>GitHub Account</label><input type="text" id="ghAccount" placeholder="jonburchel"></div>
+      <div class="form-group"><label>Default GitHub Account</label><input type="text" id="ghAccount" placeholder="your-github-username"></div>
     </div>
 
-    <button class="btn btn-primary" onclick="generateConfig()" style="margin-top: 16px;">Generate Config</button>
+    <h4 style="margin: 20px 0 8px; color: var(--text-muted);">Channels / Agents</h4>
+    <div id="channelList"></div>
+
+    <button class="btn btn-secondary" onclick="addChannel()" style="margin-top: 12px;">+ Add Channel</button>
+
+    <button class="btn btn-primary" onclick="generateConfig()" style="margin-top: 16px; margin-left: 12px;">Generate Config</button>
 
     <div class="output-area" id="configOutput">
       <div class="code-block">
@@ -410,7 +421,7 @@ graph TD
 
 <!-- INSTALLATION -->
 <div class="section">
-  <h2><span class="num">5</span> Installation</h2>
+  <h2><span class="num">4</span> Installation</h2>
 
   <div class="step">
     <div class="step-num">1</div>
@@ -500,7 +511,7 @@ Register-ScheduledTask -TaskName "TeamsMonitor" -TaskPath "\" `
 
 <!-- AUTO-UPDATE -->
 <div class="section">
-  <h2><span class="num">6</span> Auto-Update</h2>
+  <h2><span class="num">5</span> Auto-Update</h2>
   <p>Teams Monitor can keep itself up to date automatically.</p>
 
   <div class="card success">
@@ -524,7 +535,7 @@ Register-ScheduledTask -TaskName "TeamsMonitor" -TaskPath "\" `
 
 <!-- BACKGROUND TASKS -->
 <div class="section">
-  <h2><span class="num">7</span> Background Tasks</h2>
+  <h2><span class="num">6</span> Background Tasks</h2>
   <p>Edit <code>background-tasks.json</code> to add scheduled automations:</p>
 
   <div class="code-block">
@@ -551,7 +562,7 @@ Register-ScheduledTask -TaskName "TeamsMonitor" -TaskPath "\" `
 
 <!-- TROUBLESHOOTING -->
 <div class="section">
-  <h2><span class="num">8</span> Troubleshooting</h2>
+  <h2><span class="num">7</span> Troubleshooting</h2>
 
   <div class="troubleshoot-item">
     <h4>Teams MCP times out</h4>
@@ -591,7 +602,7 @@ Register-ScheduledTask -TaskName "TeamsMonitor" -TaskPath "\" `
 
 <!-- FILES -->
 <div class="section">
-  <h2><span class="num">9</span> File Reference</h2>
+  <h2><span class="num">8</span> File Reference</h2>
   <table>
     <tr><th>File</th><th>Purpose</th></tr>
     <tr><td><code>start-agents.ps1</code></td><td><strong>Main launcher.</strong> Starts proxy, configures bridges, launches persistent Copilot sessions</td></tr>
@@ -608,7 +619,7 @@ Register-ScheduledTask -TaskName "TeamsMonitor" -TaskPath "\" `
 
 <!-- AGENT MEMORY -->
 <div class="section">
-  <h2><span class="num">10</span> Agent Memory</h2>
+  <h2><span class="num">9</span> Agent Memory</h2>
   <p>Each agent maintains a persistent memory file at <code>.agents/memory/{agent-id}.md</code>. After completing significant work (not routine polling), the agent appends a timestamped entry recording what it did, decisions it made, and context it learned.</p>
 
   <div class="card success">
@@ -632,7 +643,7 @@ Jon asked for a brief PR description. Noted for future PRs.</code></pre>
 
 <!-- DESIGN JOURNEY -->
 <div class="section">
-  <h2><span class="num">11</span> Design Journey</h2>
+  <h2><span class="num">10</span> Design Journey</h2>
   <p>This architecture evolved through several iterations, each solving a specific limitation.</p>
 
   <div class="step">
@@ -720,7 +731,7 @@ function addChannel(defaults) {
   div.style.position = 'relative';
   div.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-      <h4 style="color: var(--accent); margin: 0;">Channel ${n}</h4>
+      <h4 style="color: var(--accent); margin: 0;">Agent ${n}</h4>
       <button class="btn btn-secondary" onclick="removeChannel(${n})" style="padding: 4px 12px; font-size: 0.8em; color: var(--error); border-color: var(--error);">✕ Remove</button>
     </div>
     <div class="form-row">
@@ -731,15 +742,26 @@ function addChannel(defaults) {
       <div class="form-group"><label>Channel ID</label><input type="text" data-field="channelId" value="${d.channelId || ''}" placeholder="19:xxx@thread.tacv2"></div>
       <div class="form-group"><label>Working Directory</label><input type="text" data-field="workDir" value="${d.workDir || ''}" placeholder="F:\\git\\my-repo"></div>
     </div>
+    <div class="form-row">
+      <div class="form-group"><label>Model override (optional, blank = use default)</label>
+        <select data-field="model">
+          <option value="">(use default)</option>
+          <option value="claude-opus-4.6-1m">Claude Opus 4.6 1M</option>
+          <option value="claude-opus-4.7">Claude Opus 4.7</option>
+          <option value="gpt-5.4">GPT-5.4</option>
+          <option value="claude-sonnet-4.6">Claude Sonnet 4.6</option>
+        </select>
+      </div>
+      <div class="form-group"><label>GitHub account override (optional)</label><input type="text" data-field="githubAccount" value="${d.githubAccount || ''}" placeholder="(use default)"></div>
+    </div>
     <div class="form-group">
       <label>Custom Instructions (optional, prepended to agent's default charter)</label>
-      <textarea data-field="customInstructions" rows="3" placeholder="e.g., Always check ms.date freshness before editing. Prefer short, scannable paragraphs. Never modify include files without asking first."
+      <textarea data-field="customInstructions" rows="3" placeholder="e.g., Always check ms.date freshness before editing. Prefer short, scannable paragraphs."
         style="width:100%; padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:inherit; font-size:0.9em; resize:vertical;">${d.customInstructions || ''}</textarea>
     </div>
   `;
   container.appendChild(div);
 
-  // Auto-generate agent ID from name
   const nameInput = div.querySelector('[data-field="name"]');
   const agentInput = div.querySelector('[data-field="agent"]');
   nameInput.addEventListener('input', () => {
@@ -757,20 +779,33 @@ function removeChannel(n) {
 
 function getChannels() {
   const channels = [];
+  const usedDirs = new Set();
   document.querySelectorAll('#channelList .card').forEach(card => {
     const get = (field) => (card.querySelector(`[data-field="${field}"]`)?.value || '').trim();
     const name = get('name');
-    const channelId = get('channelId');
-    if (name) {
-      channels.push({
-        name,
-        channelId: channelId || '(paste channel ID here)',
-        agent: get('agent') || name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-        workingDirectory: get('workDir') || 'F:\\home',
-        customInstructions: get('customInstructions') || undefined,
-        description: `${name} workspace`
-      });
+    if (!name) return;
+
+    const workDir = get('workDir') || 'F:\\home';
+    // Warn if duplicate working directory
+    if (usedDirs.has(workDir.toLowerCase())) {
+      console.warn(`Warning: Multiple agents share working directory "${workDir}". Each agent should have its own directory.`);
     }
+    usedDirs.add(workDir.toLowerCase());
+
+    const entry = {
+      name,
+      channelId: get('channelId') || '(paste channel ID here)',
+      agent: get('agent') || name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      workingDirectory: workDir,
+      description: `${name} workspace`
+    };
+    const model = get('model');
+    if (model) entry.model = model;
+    const gh = get('githubAccount');
+    if (gh) entry.githubAccount = gh;
+    const ci = get('customInstructions');
+    if (ci) entry.customInstructions = ci;
+    channels.push(entry);
   });
   return channels;
 }
@@ -780,17 +815,7 @@ function generateConfig() {
   const config = {
     team: document.getElementById('teamName').value,
     teamId: document.getElementById('teamId').value || '(paste team GUID here)',
-    channels: channels.map(ch => {
-      const entry = {
-        name: ch.name,
-        channelId: ch.channelId,
-        agent: ch.agent,
-        workingDirectory: ch.workingDirectory,
-        description: ch.description
-      };
-      if (ch.customInstructions) entry.customInstructions = ch.customInstructions;
-      return entry;
-    }),
+    channels,
     model: document.getElementById('model').value,
     github: {
       defaultAccount: document.getElementById('ghAccount').value || 'your-github-username',
@@ -802,7 +827,7 @@ function generateConfig() {
   document.getElementById('configOutput').classList.add('visible');
 }
 
-// Initialize with empty slate (user adds their own)
+// Initialize with one blank channel
 addChannel({ name: '', agent: '', channelId: '', workDir: '' });
 </script>
 

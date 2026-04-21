@@ -176,6 +176,10 @@ foreach ($channel in $config.channels) {
     $customInstructions = ""
     if ($channel.customInstructions) { $customInstructions = "CUSTOM INSTRUCTIONS (highest priority):`n$($channel.customInstructions)`n`n" }
 
+    # Resolve per-agent overrides (model, GitHub account)
+    $agentModel = if ($channel.model) { $channel.model } else { $Model }
+    $agentGitHub = if ($channel.githubAccount) { $channel.githubAccount } elseif ($config.github.defaultAccount) { $config.github.defaultAccount } else { "your-github-username" }
+
     # Build the persistent session prompt
     $prompt = @"
 $customInstructions
@@ -235,8 +239,8 @@ Every response you give MUST end with a call to check_messages(). No exceptions.
 ## RULES
 - Working directory: $($channel.workingDirectory)
 $(if ($channel.secondaryDirectory) { "- Secondary directory: $($channel.secondaryDirectory)" })
-- Model: $Model (use claude-opus-4.7 for sub-agents on hard tasks)
-- GitHub: jonburchel (default), jburchel_microsoft (GHE only, always switch back)
+- Model: $agentModel (use claude-opus-4.7 for sub-agents on hard tasks)
+- GitHub: $agentGitHub$(if ($config.github.gheAccount) { " (GHE: $($config.github.gheAccount), switch back after use)" })
 - Never use em-dashes
 - Read .github/copilot-instructions.md in your working directory if present
 
@@ -244,18 +248,17 @@ Begin now. Call check_messages().
 "@
 
     $promptFile = Join-Path $stateDir "prompt-$agentId.md"
-    $prompt | Out-File -FilePath $promptFile -Encoding utf8
+    [System.IO.File]::WriteAllText($promptFile, $prompt, (New-Object System.Text.UTF8Encoding $false))
     $tempFiles += $promptFile
 
     # Launch the persistent copilot session
-    # Use the local mcp-config for the bridge, plus global MCPs for mail/calendar/playwright
     $proc = Start-Process -FilePath $agencyExe -ArgumentList @(
         "copilot"
         "--mcp", "mail"
         "--mcp", "calendar"
         "--yolo", "--autopilot"
         "--max-autopilot-continues", "9999"
-        "--model", $Model
+        "--model", $agentModel
         "-p", $promptFile
     ) -PassThru -NoNewWindow -WorkingDirectory $channel.workingDirectory
 
@@ -324,10 +327,11 @@ try {
                 Write-Host "[$(Get-Date -Format 'HH:mm:ss')] $($s.name) session ended. Recycling..."
                 Start-Sleep -Seconds 5
                 $ch = $config.channels | Where-Object { $_.agent -eq $s.agent }
+                $restartModel = if ($ch.model) { $ch.model } else { $Model }
                 $s.process = Start-Process -FilePath $agencyExe -ArgumentList @(
                     "copilot", "--mcp", "mail", "--mcp", "calendar",
                     "--yolo", "--autopilot", "--max-autopilot-continues", "9999",
-                    "--model", $Model, "-p", $s.promptFile
+                    "--model", $restartModel, "-p", $s.promptFile
                 ) -PassThru -NoNewWindow -WorkingDirectory $ch.workingDirectory
                 Write-Host "[$(Get-Date -Format 'HH:mm:ss')] $($s.name) restarted (PID: $($s.process.Id))"
             }

@@ -7,7 +7,10 @@
       "channelId": "(paste channel ID here)",
       "agent": "my-channel",
       "workingDirectory": "C:\\path\\to\\your\\repo",
-      "description": "Description of this channel's purpose"
+      "description": "Description of this channel's purpose",
+      "model": "",
+      "githubAccount": "",
+      "customInstructions": ""
     }
   ],
   "model": "claude-opus-4.6-1m",
