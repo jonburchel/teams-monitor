@@ -1,0 +1,6 @@
+.agents/state/
+teams-bridge/node_modules/
+*.lock
+
+workflow.config.json
+

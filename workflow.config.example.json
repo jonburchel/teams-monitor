@@ -1,0 +1,17 @@
+{
+  "team": "My Agents",
+  "teamId": "(paste your Team GUID here)",
+  "channels": [
+    {
+      "name": "My Channel",
+      "channelId": "(paste channel ID here)",
+      "agent": "my-channel",
+      "workingDirectory": "C:\\path\\to\\your\\repo",
+      "description": "Description of this channel's purpose"
+    }
+  ],
+  "model": "claude-opus-4.6-1m",
+  "github": {
+    "defaultAccount": "your-github-username"
+  }
+}

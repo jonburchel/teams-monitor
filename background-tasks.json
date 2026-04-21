@@ -1,0 +1,17 @@
+{
+  "tasks": [
+    {
+      "id": "calendar-guard",
+      "description": "Decline meetings outside work hours (before 11:30 AM or after 10 PM ET)",
+      "intervalScans": 20,
+      "prompt": "Use the Calendar MCP to check for any NEW meeting invites (pending/tentative) on my calendar for the next 7 days. For each meeting invite:\n\n1. If the meeting starts BEFORE 11:30 AM ET or AFTER 10:00 PM ET:\n   - Check who sent it. Do NOT decline if the organizer is an org leader, my direct manager, a team member I work with closely, or someone I frequently interact with. Use your judgment based on titles (Director, VP, GM, CVP, Partner, etc.) and context from WorkIQ if needed.\n   - If it's safe to decline: decline the invite WITHOUT sending a response (silently decline, do not notify the organizer).\n   - Log what you declined to the Home channel: '<strong>🤖 Copilot:</strong> Auto-declined: [meeting title] at [time] from [organizer] (outside work hours)'\n2. If the meeting is within work hours (11:30 AM - 10:00 PM ET), leave it alone.\n\nBe conservative: when in doubt about whether someone is important, do NOT decline."
+    },
+    {
+      "id": "email-digest",
+      "description": "Check email and summarize important items to Home channel",
+      "intervalScans": 40,
+      "enabled": false,
+      "prompt": "Use the Mail MCP to check for unread emails from the last 20 minutes. If there are any that seem important or actionable, post a brief summary to the Home channel as an Adaptive Card."
+    }
+  ]
+}
