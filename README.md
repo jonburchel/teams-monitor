@@ -30,7 +30,7 @@ Teams Channels <---> Agency Teams MCP HTTP Proxy (default port 58410)
 git clone https://github.com/jonburchel/teams-monitor.git
 cd teams-monitor && cd teams-bridge && npm install && cd ..
 cp workflow.config.example.json workflow.config.json  # edit with your IDs
-.\auth.cmd                      # one-time OAuth sign-in (MCPs + Graph Chat)
+.\auth.cmd                      # one-time OAuth sign-in
 .\start-agents.ps1              # start monitoring
 .\start-agents.ps1 -AutoUpdate  # with auto-pull from git
 ```
@@ -43,11 +43,9 @@ teams-monitor/
   workflow.config.json          # Your config (gitignored, create from example)
   workflow.config.example.json   # Template config
   background-tasks.json         # Scheduled automations
-  auth.cmd                      # One-time auth (MCPs + Graph Chat API)
+  auth.cmd                      # One-time MCP auth
   teams-bridge/
     index.mjs                   # Bridge MCP: polls, queues, replies, thread tracking
-    graph-helpers.mjs            # Graph API: OAuth2 device code flow, mark self-chat unread
-    auth-graph.mjs               # Standalone Graph auth setup script
   .agents/
     charter-source/             # Agent charters per channel
     memory/                     # Persistent agent memory (committed to git)

@@ -24,7 +24,6 @@ import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { markSelfChatUnread, init as initGraph, hasAuth as hasGraphAuth } from "./graph-helpers.mjs";
 
 let ServiceBusClient;
 try {
@@ -497,16 +496,13 @@ server.tool(
         lastActivity: new Date().toISOString()
       });
 
-      // Fire-and-forget: send self-DM notification, then mark chat as unread
+      // Fire-and-forget: send self-DM notification
       setTimeout(async () => {
         try {
           await mcpToolCall("SendMessageToSelf", {
             content: `[Teams Monitor] ${channelName}: ${replyText.slice(0, 80)}...`
           });
-          // Mark the self-DM chat unread so the badge persists
-          const r = await markSelfChatUnread();
-          if (r.success) console.error(`${label} Self-DM sent + marked unread`);
-          else console.error(`${label} Self-DM sent, mark-unread skipped: ${r.error}`);
+          console.error(`${label} Self-DM sent`);
         } catch (e) {
           console.error(`${label} Self-DM failed: ${e.message}`);
         }
@@ -597,17 +593,6 @@ function schedulePoll() {
 async function main() {
   console.error(`${label} Starting Teams Bridge MCP (proxy at port ${mcpPort})...`);
 
-  // Initialize Graph API for mark-unread (best-effort, never blocks startup)
-  try {
-    initGraph({ stateDir: STATE_DIR });
-    if (hasGraphAuth()) {
-      console.error(`${label} Graph chat auth ready (mark-unread enabled).`);
-    } else {
-      console.error(`${label} No Graph chat auth. Run: node teams-bridge/auth-graph.mjs`);
-    }
-  } catch (e) {
-    console.error(`${label} Graph init skipped: ${e.message}`);
-  }
   try {
     await initMcp();
   } catch (e) {
