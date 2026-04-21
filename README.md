@@ -24,8 +24,6 @@ Teams Channels <---> Agency Teams MCP HTTP Proxy (default port 58410)
 
 **Why not Graph webhooks?** Requires a public HTTPS endpoint. **Why not a browser?** Teams' SPA DOM is fragile and headless Edge is unreliable for long-running monitoring.
 
-Design validated by independent Claude Opus 4.7 architecture reviews at multiple stages.
-
 ## Quick Start
 
 ```powershell
@@ -37,8 +35,6 @@ cp workflow.config.example.json workflow.config.json  # edit with your IDs
 .\start-agents.ps1 -AutoUpdate  # with auto-pull from git
 ```
 
-The watcher module (teams-watcher.mjs) is experimental and not used in the default flow.
-
 ## Files
 
 ```
@@ -49,9 +45,7 @@ teams-monitor/
   background-tasks.json         # Scheduled automations
   auth.cmd                      # One-time MCP auth
   teams-bridge/
-    index.mjs                   # Bridge MCP: polls, queues, replies, thread tracking, auto-mark-unread
-    mark-unread.mjs             # Deterministic Playwright module: persistent browser, direct URL nav, pre-researched selectors
-    teams-watcher.mjs           # Browser watcher (experimental, not used in default flow)
+    index.mjs                   # Bridge MCP: polls, queues, replies, thread tracking
   .agents/
     charter-source/             # Agent charters per channel
     memory/                     # Persistent agent memory (committed to git)

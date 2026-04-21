@@ -24,7 +24,7 @@ import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { markThreadUnread, closeBrowser } from "./mark-unread.mjs";
+
 
 let ServiceBusClient;
 try {
@@ -359,7 +359,7 @@ async function poll() {
         // Check if thread is expired (24h since last activity)
         const lastAct = new Date(threadInfo.lastActivity).getTime();
         if (now - lastAct > THREAD_TTL_MS) {
-          // Post a closing note (no mark-unread, no self-DM)
+          // Post a closing note (no self-DM)
           try {
             await mcpToolCall("ReplyToChannelMessage", {
               teamId: config.teamId,
@@ -504,16 +504,7 @@ server.tool(
         }).catch(e => console.error(`${label} Self-DM failed: ${e.message}`));
       }, 500);
 
-      // Fire-and-forget: mark thread as unread via deterministic Playwright automation
-      // This runs in the background and never blocks the main loop
-      markThreadUnread(channelId, config.teamId, channelName, replyText.slice(0, 60))
-        .then(r => {
-          if (r.success) console.error(`${label} Marked unread (${r.elapsed}ms, ${r.method})`);
-          else console.error(`${label} Mark-unread skipped: ${r.error}`);
-        })
-        .catch(e => console.error(`${label} Mark-unread error: ${e.message}`));
-
-      return { content: [{ type: "text", text: JSON.stringify({ success: true }) }] };
+      return{ content: [{ type: "text", text: JSON.stringify({ success: true }) }] };
     } catch (e) {
       return { content: [{ type: "text", text: JSON.stringify({ success: false, error: e.message }) }] };
     }
@@ -627,7 +618,6 @@ process.on("SIGINT", () => { cleanup(); process.exit(0); });
 process.on("SIGTERM", () => { cleanup(); process.exit(0); });
 function cleanup() {
   clearTimeout(pollTimer);
-  closeBrowser().catch(() => {});
 }
 
 main().catch(e => { console.error(`${label} Fatal: ${e.message}`); process.exit(1); });
