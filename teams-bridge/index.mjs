@@ -448,14 +448,6 @@ server.tool(
     }
     pendingLastSeen.length = 0;
 
-    // Fire-and-forget: acknowledge each message with a 👀 reaction so user sees "working on it"
-    for (const m of msgs) {
-      mcpToolCall("SetMessageReaction", {
-        teamId: config.teamId, channelId: m.channelId, messageId: m.messageId,
-        reactionType: "like"
-      }).catch(() => {}); // Silently ignore if reaction API unavailable
-    }
-
     return { content: [{ type: "text", text: JSON.stringify({
       newMessages: msgs.map(m => ({
         channel: m.channel, channelId: m.channelId, workDir: m.workDir,
@@ -505,16 +497,12 @@ server.tool(
         lastActivity: new Date().toISOString()
       });
 
-      // Fire-and-forget: send self-DM notification
-      mcpToolCall("SendMessageToSelf", {
-        content: `[Teams Monitor] ${channelName}: ${replyText.slice(0, 80)}...`
-      }).catch(e => console.error(`${label} SendMessageToSelf failed: ${e.message}`));
-
-      // Fire-and-forget: remove the "like" acknowledgment reaction now that we've replied
-      mcpToolCall("RemoveMessageReaction", {
-        teamId: config.teamId, channelId, messageId,
-        reactionType: "like"
-      }).catch(() => {});
+      // Fire-and-forget: send self-DM notification (wrapped to never interfere with poll)
+      setTimeout(() => {
+        mcpToolCall("SendMessageToSelf", {
+          content: `[Teams Monitor] ${channelName}: ${replyText.slice(0, 80)}...`
+        }).catch(e => console.error(`${label} Self-DM failed: ${e.message}`));
+      }, 500);
 
       // Fire-and-forget: mark thread as unread via deterministic Playwright automation
       // This runs in the background and never blocks the main loop
