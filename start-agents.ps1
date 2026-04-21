@@ -130,36 +130,27 @@ $watcherProc = $null
 # Step 2: Generate per-channel MCP config and prompt, then launch sessions
 $sessions = @()
 $tempFiles = @()
-$userMcpConfig = Join-Path $env:USERPROFILE ".copilot\mcp-config.json"
-$backupConfig = "$userMcpConfig.bak-teams-monitor"
-
-# Backup MCP config ONCE before any modifications (only if no backup exists)
-if ((Test-Path $userMcpConfig) -and -not (Test-Path $backupConfig)) {
-    Copy-Item $userMcpConfig $backupConfig -Force -ErrorAction SilentlyContinue
-    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Backed up mcp-config.json"
-}
 
 foreach ($channel in $config.channels) {
     $agentId = $channel.agent
     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Setting up $($channel.name) ($agentId)..."
 
-    # Add bridge to the user's MCP config
+    # Write a LOCAL mcp config for the bridge (never touches global config)
     $bridgeIndexPath = Join-Path $bridgeDir "index.mjs"
     $bridgeKey = "teams-bridge-$agentId"
+    $localMcpConfig = Join-Path $stateDir "mcp-bridge-$agentId.json"
 
-    if (Test-Path $userMcpConfig) {
-        $mcpJson = Get-Content $userMcpConfig -Raw | ConvertFrom-Json
-        if (-not $mcpJson.mcpServers) {
-            $mcpJson | Add-Member -NotePropertyName "mcpServers" -NotePropertyValue ([pscustomobject]@{}) -Force
+    $bridgeConfig = @{
+        mcpServers = @{
+            $bridgeKey = @{
+                command = $nodeExe
+                args = @($bridgeIndexPath, "--channel", $channel.name, "--mcp-port", "$McpPort")
+                tools = @("*")
+            }
         }
-        $mcpJson.mcpServers | Add-Member -NotePropertyName $bridgeKey -NotePropertyValue @{
-            command = $nodeExe
-            args = @($bridgeIndexPath, "--channel", $channel.name, "--mcp-port", "$McpPort")
-            tools = @("*")
-        } -Force
-        [System.IO.File]::WriteAllText($userMcpConfig, ($mcpJson | ConvertTo-Json -Depth 100), (New-Object System.Text.UTF8Encoding $false))
-        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Added $bridgeKey to ~/.copilot/mcp-config.json"
     }
+    [System.IO.File]::WriteAllText($localMcpConfig, ($bridgeConfig | ConvertTo-Json -Depth 10), (New-Object System.Text.UTF8Encoding $false))
+    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Bridge config: $localMcpConfig"
 
     # Read channel charter if it exists
     $charterPath = Join-Path $scriptDir ".agents\charter-source\$agentId.md"
@@ -282,11 +273,12 @@ Begin now. Call check_messages().
     [System.IO.File]::WriteAllText($promptFile, $prompt, (New-Object System.Text.UTF8Encoding $false))
     $tempFiles += $promptFile
 
-    # Launch the persistent copilot session
+    # Launch the persistent copilot session with local bridge config
     $proc = Start-Process -FilePath $agencyExe -ArgumentList @(
         "copilot"
         "--mcp", "mail"
         "--mcp", "calendar"
+        "--additional-mcp-config", "@$localMcpConfig"
         "--yolo", "--autopilot"
         "--max-autopilot-continues", "9999"
         "--model", $agentModel
@@ -299,6 +291,7 @@ Begin now. Call check_messages().
         process = $proc
         promptFile = $promptFile
         bridgeKey = $bridgeKey
+        localMcpConfig = $localMcpConfig
     }
 
     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] $($channel.name) agent started (PID: $($proc.Id))"
@@ -328,11 +321,6 @@ try {
                     foreach ($s in $sessions) { if ($s.process -and -not $s.process.HasExited) { $s.process.Kill() } }
                     if ($mcpProc -and -not $mcpProc.HasExited) { $mcpProc.Kill() }
                     if ($watcherProc -and -not $watcherProc.HasExited) { $watcherProc.Kill() }
-                    # Restore MCP config before restart (finally won't run cleanly)
-                    if (Test-Path $backupConfig) {
-                        Copy-Item $backupConfig $userMcpConfig -Force
-                        Remove-Item $backupConfig -Force -ErrorAction SilentlyContinue
-                    }
                     Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
                     $script:isRestarting = $true
                     & $MyInvocation.MyCommand.Path -Model $Model -McpPort $McpPort -AutoUpdate
@@ -366,6 +354,7 @@ try {
                 $restartModel = if ($ch.model) { $ch.model } else { $Model }
                 $s.process = Start-Process -FilePath $agencyExe -ArgumentList @(
                     "copilot", "--mcp", "mail", "--mcp", "calendar",
+                    "--additional-mcp-config", "@$($s.localMcpConfig)",
                     "--yolo", "--autopilot", "--max-autopilot-continues", "9999",
                     "--model", $restartModel, "-p", $s.promptFile
                 ) -PassThru -NoNewWindow -WorkingDirectory $ch.workingDirectory
@@ -385,13 +374,6 @@ try {
         }
         if ($mcpProc -and -not $mcpProc.HasExited) { $mcpProc.Kill(); Write-Host "  Killed MCP proxy" }
         if ($watcherProc -and -not $watcherProc.HasExited) { $watcherProc.Kill(); Write-Host "  Killed browser watcher" }
-
-        # Restore MCP config from backup
-        if (Test-Path $backupConfig) {
-            Copy-Item $backupConfig $userMcpConfig -Force
-            Remove-Item $backupConfig -Force -ErrorAction SilentlyContinue
-            Write-Host "  Restored mcp-config.json from backup"
-        }
         Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
         Write-Host "[$(Get-Date -Format 'HH:mm:ss')] All stopped."
     }

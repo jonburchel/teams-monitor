@@ -6,7 +6,7 @@ See **teams-monitor-setup-guide.html** for full interactive documentation.
 
 ## What It Does
 
-Post a message in a Teams channel. Within seconds, a persistent AI agent responds in-thread with a styled Adaptive Card. Each agent works in a specific repo directory, has access to mail, calendar, and any MCP servers in your global ~/.copilot/mcp-config.json, and maintains a memory file across sessions.
+Post a message in a Teams channel. Within seconds, a persistent AI agent responds in-thread with a styled Adaptive Card. Each agent works in a specific repo directory, has access to mail, calendar, and MCP tools, and maintains a memory file across sessions. Per-agent bridge MCPs are loaded via local config files, so your global ~/.copilot/mcp-config.json is never touched.
 
 ## Architecture
 
@@ -61,4 +61,4 @@ teams-monitor/
 
 ## Stopping
 
-Ctrl+C or create `.agents\ralph-stop`. Cleans up all processes, browser, and restores MCP config.
+Ctrl+C or create `.agents\ralph-stop`. Cleans up all processes and browser. No global config restoration needed (bridge MCPs use local config files only).

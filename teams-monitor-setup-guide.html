@@ -277,8 +277,8 @@ graph TD
     style M3 fill:#553c00,stroke:#d69e2e,color:#fefcbf
   </pre>
   <p style="color: var(--text-muted); font-size: 0.9em; margin-top: 12px; text-align: center;">
-    <strong>Three-tier detection:</strong> Browser watcher injects MutationObserver per channel (instant push) → triggers fast polling (3s) in bridge MCPs → Graph API fetches actual message content.<br>
-    No channel clicking. Unread state preserved. Copilot sessions stay warm with persistent memory.
+    <strong>Per-channel bridge MCPs</strong> poll the shared Teams MCP proxy every 5 seconds via direct HTTP. New messages are queued and delivered to persistent Copilot sessions.<br>
+    Bridge configs are loaded via <code>--additional-mcp-config</code> (local files only; global ~/.copilot/mcp-config.json is never touched). Copilot sessions stay warm with persistent memory.
   </p>
 </div>
 
