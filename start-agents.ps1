@@ -200,7 +200,11 @@ foreach ($channel in $config.channels) {
         if ($srcItem.PSIsContainer) {
             cmd /c mklink /J "$dst" "$src" 2>$null | Out-Null
         } else {
-            New-Item -ItemType HardLink -Path $dst -Target $src -Force -ErrorAction SilentlyContinue | Out-Null
+            # Hardlinks require same drive; use symlink as first fallback, copy as last resort
+            New-Item -ItemType HardLink -Path $dst -Target $src -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue 2>$null | Out-Null
+            if (-not (Test-Path $dst)) {
+                New-Item -ItemType SymbolicLink -Path $dst -Target $src -Force -ErrorAction SilentlyContinue 2>$null | Out-Null
+            }
             if (-not (Test-Path $dst)) { Copy-Item $src $dst -Force }
         }
     }
