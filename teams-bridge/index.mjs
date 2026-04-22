@@ -80,7 +80,6 @@ let bgTaskSchedule = {}; // taskId -> nextDueAt (wall clock)
 let pollTimer = null;
 let seenIds = new Set(); // dedup by message ID
 let activeThreads = new Map(); // root message ID -> { channelId, channelName, lastActivity: ISO timestamp }
-let reactionTools = { set: null, unset: null }; // discovered during MCP init
 let sbReceiver = null; // Service Bus receiver (if configured)
 let usePushMode = false; // true when Service Bus is active
 
@@ -198,30 +197,6 @@ async function mcpToolCall(name, args) {
   }
 }
 
-async function setReaction(channelId, messageId, emoji) {
-  if (!reactionTools.set) return;
-  try {
-    await mcpCall("tools/call", {
-      name: reactionTools.set,
-      arguments: { teamId: config.teamId, channelId, messageId, reactionType: emoji }
-    }, 15000);
-  } catch (e) {
-    console.error(`${label} setReaction failed: ${e.message}`);
-  }
-}
-
-async function unsetReaction(channelId, messageId, emoji) {
-  if (!reactionTools.unset) return;
-  try {
-    await mcpCall("tools/call", {
-      name: reactionTools.unset,
-      arguments: { teamId: config.teamId, channelId, messageId, reactionType: emoji }
-    }, 15000);
-  } catch (e) {
-    console.error(`${label} unsetReaction failed: ${e.message}`);
-  }
-}
-
 async function initMcp() {
   let attempt = 0;
   while (true) {
@@ -236,23 +211,6 @@ async function initMcp() {
       await mcpCall("notifications/initialized", {});
       mcpInitialized = true;
       console.error(`${label} Teams MCP ready on port ${mcpPort}${attempt > 1 ? ` (after ${attempt} attempts)` : ""}`);
-
-      // Discover reaction tools
-      try {
-        const toolsEnv = await mcpCall("tools/list", {});
-        const tools = toolsEnv?.result?.tools || [];
-        const names = tools.map(t => t.name);
-        const setTool = names.find(n => /set.*reaction/i.test(n) && !/unset/i.test(n));
-        const unsetTool = names.find(n => /unset.*reaction/i.test(n));
-        if (setTool && unsetTool) {
-          reactionTools = { set: setTool, unset: unsetTool };
-          console.error(`${label} Reactions enabled: ${setTool} / ${unsetTool}`);
-        } else {
-          console.error(`${label} No reaction tools in MCP proxy (${names.length} tools available)`);
-        }
-      } catch (e) {
-        console.error(`${label} Could not discover tools: ${e.message}`);
-      }
 
       return;
     } catch (e) {
@@ -490,11 +448,6 @@ server.tool(
     }
     pendingLastSeen.length = 0;
 
-    // Fire-and-forget: react 🔍 to each message being picked up
-    for (const m of msgs) {
-      setReaction(m.channelId, m.messageId, "🔍");
-    }
-
     return { content: [{ type: "text", text: JSON.stringify({
       newMessages: msgs.map(m => ({
         channel: m.channel, channelId: m.channelId, workDir: m.workDir,
@@ -543,11 +496,6 @@ server.tool(
         channelId, channelName,
         lastActivity: new Date().toISOString()
       });
-
-      // Fire-and-forget: change 🔍 to ✅
-      unsetReaction(channelId, messageId, "🔍")
-        .then(() => setReaction(channelId, messageId, "✅"))
-        .catch(() => {});
 
       // Fire-and-forget: send self-DM notification
       setTimeout(async () => {
