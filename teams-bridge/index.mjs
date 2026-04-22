@@ -581,14 +581,17 @@ server.tool(
       const cardJson = JSON.stringify({
         type: "AdaptiveCard", version: "1.4",
         body: [
-          { type: "ColumnSet", columns: [
-            { type: "Column", width: "auto", items: [{ type: "Image", url: "https://img.icons8.com/fluency/48/robot-2.png", size: "Small" }] },
-            { type: "Column", width: "stretch", items: [
-              { type: "TextBlock", text: "Teams Monitor", weight: "Bolder", size: "Medium" },
-              { type: "TextBlock", text: channelName, isSubtle: true, spacing: "None", size: "Small" }
+          { type: "Container", style: "good", bleed: true, items: [
+            { type: "ColumnSet", columns: [
+              { type: "Column", width: "auto", verticalContentAlignment: "Center",
+                items: [{ type: "Image", url: "https://img.icons8.com/fluency/48/robot-2.png", size: "Small" }] },
+              { type: "Column", width: "stretch", items: [
+                { type: "TextBlock", text: "Teams Monitor", weight: "Bolder", size: "Medium" },
+                { type: "TextBlock", text: `🟢 Online — ${channelName}`, isSubtle: true, spacing: "None", size: "Small" }
+              ]}
             ]}
           ]},
-          { type: "TextBlock", text: messageText, wrap: true }
+          { type: "TextBlock", text: messageText, wrap: true, spacing: "Medium" }
         ]
       });
 
