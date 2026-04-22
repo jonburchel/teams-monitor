@@ -109,7 +109,7 @@
 <div class="hero">
   <h1>🤖 Teams Monitor</h1>
   <p>AI agents that live in your Microsoft Teams channels, powered by GitHub Copilot CLI and Agency.</p>
-  <div class="badge">Built with Agency + Copilot CLI + Custom MCP</div>
+  <div class="badge">Inspired by Squad · Built with Agency + Copilot CLI + Custom MCP</div>
 </div>
 
 <div class="container">
@@ -172,13 +172,13 @@
   </div>
 </div>
 
-<!-- WHY NOT SQUAD -->
+<!-- INSPIRED BY SQUAD -->
 <div class="section">
-  <h2>Why Not Squad?</h2>
+  <h2>From Squad Demo to Teams Monitor</h2>
 
   <div class="card">
-    <h4 style="color: var(--accent);">We evaluated Squad seriously</h4>
-    <p>This project began as a Squad implementation. We installed <code>@bradygaster/squad-cli</code>, created agent charters following Squad conventions, and explored Squad's watch/triage/loop modes. We wanted to use it. The question was whether Squad's multi-agent orchestration layer added value for our specific use case: monitoring Teams channels and responding to messages.</p>
+    <h4 style="color: var(--accent);">How this started</h4>
+    <p>This project began when <strong>Jen Weigel</strong> demoed using Microsoft Teams to interact with <a href="https://github.com/bradygaster/squad" style="color: var(--accent);">Squad</a>, a multi-agent dev team orchestrator for GitHub Copilot. That demo sparked the idea: what if you could talk to your own Copilot CLI agents from Teams, each one working in a specific repo? We installed Squad, created agent charters following its conventions, and started building.</p>
   </div>
 
   <div style="margin: 24px 0;">
@@ -192,38 +192,27 @@
       <li>Watch mode that triages GitHub issues and dispatches Copilot agents</li>
     </ul>
 
-    <h3 style="margin-top: 20px;">What we actually needed</h3>
-    <p>Our problem is fundamentally different: <strong>single-agent-per-channel, responding to Teams chat messages in real time.</strong> There's no cross-agent coordination needed (each channel is independent). There's no GitHub issue triage. The "routing" is trivially solved by channel identity. Adding Squad's coordinator on top would be overhead without benefit.</p>
-  </div>
-
-  <div class="card" style="border-color: var(--purple);">
-    <h4 style="color: var(--purple);">🧠 Validated by independent Opus 4.7 architecture review</h4>
-    <p style="margin-top: 8px;">To confirm we weren't making a mistake, we ran a rigorous architectural review using Claude Opus 4.7 (highest available intelligence tier) comparing our solution against Squad. Key findings:</p>
-    <ul style="margin: 12px 0; padding-left: 24px; color: var(--text-muted);">
-      <li><strong>"Squad doesn't do this."</strong> Squad is a GitHub-issue-shaped orchestrator. Forcing it to monitor Teams channels would mean writing all the same plumbing we already wrote, then bolting Squad's coordinator on top to route work that doesn't need routing.</li>
-      <li><strong>"Comparing them is a category error."</strong> The relevant question isn't "is our solution better than Squad" but "did we reinvent things Squad already solved well?" Answer: a few patterns worth borrowing (persistent agent history, structured decision logs), but not the runtime.</li>
-      <li><strong>"Stop calling it Squad-inspired if it isn't."</strong> The review recommended honest attribution: cite Squad as prior art we evaluated, not as a dependency or inspiration we didn't actually use.</li>
-    </ul>
-    <p style="margin-top: 8px; color: var(--text-muted); font-size: 0.9em;">The same review also identified critical bugs in our bridge MCP (race conditions on shared state, message deduplication gaps, destructive queue reads) which we fixed before shipping.</p>
+    <h3 style="margin-top: 20px;">Where we diverged</h3>
+    <p>As we built, we realized the two tools optimize for <strong>different interaction models</strong>. Squad is built around GitHub issue triage: a coordinator routes work to specialist agents. Our problem was different: persistent, single-agent-per-channel conversations in real time via Teams, where "routing" is trivially handled by channel identity. The Teams message loop, the Adaptive Card formatting, the polling infrastructure, and the thread tracking all had to be built from scratch regardless, and Squad's coordination layer wasn't needed on top of that.</p>
+    <p style="margin-top: 8px;">So we diverged. Teams Monitor is not "Squad in Teams." It's a separate tool, built for a different workflow, that started from a Squad demo. We borrowed some good patterns from Squad (persistent agent memory, structured decision logs), and the two tools serve different needs well.</p>
   </div>
 
   <div style="margin-top: 24px;">
-    <h3>What we built instead</h3>
+    <h3>Different tools, different problems</h3>
     <table>
-      <tr><th>Concern</th><th>Squad approach</th><th>Our approach</th></tr>
-      <tr><td>Message source</td><td>GitHub Issues</td><td>Teams channel messages</td></tr>
-      <tr><td>Routing</td><td>Coordinator agent dispatches to specialists</td><td>Channel identity = agent (1:1, no routing needed)</td></tr>
-      <tr><td>Agent runtime</td><td><code>copilot --agent squad</code></td><td>Persistent <code>agency copilot</code> sessions with custom MCP</td></tr>
+      <tr><th>Concern</th><th>Squad</th><th>Teams Monitor</th></tr>
+      <tr><td>Interaction model</td><td>GitHub Issues</td><td>Teams channel messages</td></tr>
+      <tr><td>Routing</td><td>Coordinator agent dispatches to specialists</td><td>Channel identity = agent (1:1)</td></tr>
+      <tr><td>Agent runtime</td><td><code>copilot --agent squad</code></td><td>Persistent Copilot CLI sessions with custom MCP</td></tr>
       <tr><td>Message transport</td><td>GitHub API</td><td>Custom Node.js MCP bridging Microsoft Graph API</td></tr>
-      <tr><td>Reply formatting</td><td>GitHub comments</td><td>Teams Adaptive Cards</td></tr>
-      <tr><td>Scheduling</td><td>Squad watch/triage loop</td><td>Custom background-tasks.json with wall-clock scheduling</td></tr>
-      <tr><td>Dependencies</td><td>Squad CLI + SDK</td><td>Agency CLI + Node.js + custom MCP only</td></tr>
+      <tr><td>Reply formatting</td><td>GitHub comments (Markdown)</td><td>Teams Adaptive Cards</td></tr>
+      <tr><td>Best for</td><td>Multi-agent orchestration on GitHub repos</td><td>Real-time repo work from a Teams interface</td></tr>
     </table>
   </div>
 
   <div class="card success" style="margin-top: 20px;">
     <h4 style="color: var(--accent2);">Bottom line</h4>
-    <p>Squad is excellent for what it does. It just doesn't do what we need. Our solution is purpose-built for Teams channel monitoring with the minimum viable stack: Agency for Copilot session management, a custom Node.js MCP for Teams integration, and PowerShell for orchestration. No unnecessary abstractions.</p>
+    <p>Squad is the right choice when you want multi-agent orchestration driven by GitHub issues. Teams Monitor is the right choice when you want persistent, repo-aware AI agents accessible through a Teams channel. They solve different problems, and the exploration of Squad directly shaped the thinking that led to this architecture.</p>
   </div>
 </div>
 
@@ -600,7 +589,8 @@ Register-ScheduledTask -TaskName "TeamsMonitor" -TaskPath "\" `
     <tr><td><code>background-tasks.json</code></td><td>Scheduled automations (calendar guard, email digest)</td></tr>
     <tr><td><code>auth.cmd</code></td><td>One-time MCP OAuth sign-in (opens browser)</td></tr>
     <tr><td><code>teams-bridge/index.mjs</code></td><td>Teams Bridge MCP: polls proxy, queues messages, posts Adaptive Card replies, tracks threads</td></tr>
-    <tr><td><code>teams-bridge/teams-watcher.mjs</code></td><td>Browser watcher (experimental, not used in default flow)</td></tr>
+    <tr><td><code>azure-function/</code></td><td>Azure Function webhook handler for Graph push notifications (ready, needs permissions)</td></tr>
+    <tr><td><code>create-subscriptions.ps1</code></td><td>Graph webhook subscription setup (ready, needs permissions)</td></tr>
     <tr><td><code>.agents/charter-source/</code></td><td>Agent charters: identity, expertise, channel-specific instructions</td></tr>
     <tr><td><code>.agents/memory/</code></td><td>Persistent agent memory: decisions, learnings, context across sessions (committed to git)</td></tr>
     <tr><td><code>.agents/state/</code></td><td>Runtime state: last-seen cursors, lock file, bridge MCP configs, prompts (gitignored)</td></tr>
@@ -639,8 +629,8 @@ Jon asked for a brief PR description. Noted for future PRs.</code></pre>
   <div class="step">
     <div class="step-num">1</div>
     <div class="step-content">
-      <h4>Started with Squad + polling loop</h4>
-      <p>Initial approach: use Squad's <code>watch</code> mode with a PowerShell loop that spawned a new <code>agency copilot</code> per message. Worked, but 90+ second latency (30s poll + 60s copilot cold start) and no context between messages.</p>
+      <h4>Started from a Squad demo</h4>
+      <p>Jen Weigel's demo of using Teams with Squad sparked this project. Initial approach: use Squad's <code>watch</code> mode with a PowerShell loop that spawned a new <code>agency copilot</code> per message. Worked, but 90+ second latency (30s poll + 60s copilot cold start), no context between messages, and the Teams interaction model needed its own infrastructure.</p>
     </div>
   </div>
 
@@ -679,14 +669,51 @@ Jon asked for a brief PR description. Noted for future PRs.</code></pre>
   <div class="step">
     <div class="step-num">6</div>
     <div class="step-content">
-      <h4>Opus 4.7 architecture reviews</h4>
-      <p>At each stage, independent reviews by Claude Opus 4.7 validated the design, caught critical bugs (race conditions, duplicate replies, auth failures, DOM issues), and confirmed that Squad was the wrong tool for this specific problem. The reviews shaped the final architecture significantly.</p>
+      <h4>Architecture reviews and bug fixing</h4>
+      <p>At each stage, independent architecture reviews validated the design and caught critical bugs (race conditions, duplicate replies, auth failures, DOM issues). These reviews shaped the final architecture significantly and confirmed that the Teams message loop needed purpose-built infrastructure rather than an orchestration layer on top.</p>
     </div>
   </div>
 
   <div class="card" style="border-color: var(--purple);">
-    <h4 style="color: var(--purple);">Key insight: Graph API limitations drove every design decision</h4>
-    <p>Microsoft Graph API cannot push-notify local clients (requires public HTTPS endpoint) and cannot mark messages as unread (no API exists). We work around the unread limitation by using the Playwright MCP to right-click and mark threads as unread in the Teams Web UI after each agent reply. These constraints forced the two-tier architecture: Bridge MCPs for message detection and handling (5s polling), and persistent Copilot sessions for processing. Each tier works around a specific platform limitation without requiring external infrastructure.</p>
+    <h4 style="color: var(--purple);">Key insight: Teams API constraints drove every design decision</h4>
+    <p>Without an Entra ID app registration, we can't get a bot identity, webhooks, or direct Graph API access. The Agency Teams MCP (backed by M365 Copilot/WorkIQ) provides read and write access to channels, but all messages appear from the authenticated user's account. These constraints forced the two-tier architecture: Bridge MCPs handle message detection and queuing (5s polling), while persistent Copilot sessions handle processing. Each tier works around a specific platform limitation.</p>
+  </div>
+</div>
+
+<!-- LIMITATIONS & ROADMAP -->
+<div class="section">
+  <h2><span class="num">11</span> Current Limitations &amp; Roadmap</h2>
+  <p>Teams Monitor works today, but runs on a workaround. The current implementation uses Agency's Teams MCP (backed by M365 Copilot) to poll for messages, because we do not yet have the Entra ID app registration or Graph API permissions needed for direct Teams API access.</p>
+
+  <div class="card warning" style="margin-top: 20px;">
+    <h4 style="color: var(--warning);">⚠️ Current constraints (WorkIQ polling mode)</h4>
+    <table style="margin-top: 12px;">
+      <tr><th>Limitation</th><th>Impact</th></tr>
+      <tr><td><strong>No bot identity</strong></td><td>Messages appear from your own account, not a dedicated bot. Adaptive Cards are visually distinct, but the sender shows as you.</td></tr>
+      <tr><td><strong>No read/unread control</strong></td><td>When the agent replies, the channel doesn't show as unread for other users. No way to signal "new response here" through Teams notifications.</td></tr>
+      <tr><td><strong>No reactions or processing indicators</strong></td><td>Can't add a 👀 when processing or ✅ when complete. Users get no feedback between posting a request and receiving the reply.</td></tr>
+      <tr><td><strong>Polling latency</strong></td><td>~5-8 second detection time via Graph API polling. Sub-second with optional Azure Service Bus push mode, but that requires additional infrastructure.</td></tr>
+      <tr><td><strong>Single-user auth</strong></td><td>All activity runs under one user's OAuth token. Only that user can authenticate and run the monitor.</td></tr>
+    </table>
+  </div>
+
+  <div class="card success" style="margin-top: 20px;">
+    <h4 style="color: var(--accent2);">✅ With an Entra ID app registration + Graph API permissions</h4>
+    <p style="margin-top: 8px;">These improvements become possible with an app registration and the appropriate delegated or application permissions:</p>
+    <ul style="margin: 12px 0; padding-left: 24px; color: var(--text-muted);">
+      <li><strong>Dedicated bot identity</strong> — Messages come from "Teams Monitor" bot, visually and functionally distinct from user messages</li>
+      <li><strong>Direct Graph API access</strong> — <code>ChannelMessage.Read.All</code> and <code>ChannelMessage.Send</code> for reading and posting without MCP intermediation</li>
+      <li><strong>Real-time webhooks</strong> — Change Notifications for instant push detection. The Azure Function webhook handler and subscription management script are <em>already built</em> (see <code>azure-function/</code> and <code>create-subscriptions.ps1</code>), just waiting for permissions.</li>
+      <li><strong>Message reactions</strong> — React to messages via Graph API (beta) to show processing status</li>
+    </ul>
+  </div>
+
+  <div class="card" style="margin-top: 20px;">
+    <h4 style="color: var(--text-muted);">Platform constraints (no API exists, regardless of permissions)</h4>
+    <ul style="margin: 12px 0; padding-left: 24px; color: var(--text-muted);">
+      <li><strong>Mark messages as unread</strong> — Microsoft Graph does not expose this capability for channel messages. This is a platform limitation, not a permissions issue.</li>
+      <li><strong>Typing indicators in channels</strong> — No Graph API for typing indicators in team channel messages.</li>
+    </ul>
   </div>
 </div>
 
